@@ -235,7 +235,7 @@ public class RaceCommand implements CommandExecutor {
             return;
         }
         if (args.length < 2) {
-            p.sendMessage(Component.text("Usage: /race admin <wand|startvote|delete|visualize|reload|setmainlobby>",
+            p.sendMessage(Component.text("Usage: /race admin <wand|startvote|delete|visualize|reload|setmainlobby|purgeholograms>",
                     NamedTextColor.RED));
             return;
         }
@@ -317,6 +317,16 @@ public class RaceCommand implements CommandExecutor {
                 }
                 plugin.saveArenas();
                 p.sendMessage(Component.text("Main lobby set for all arenas!", NamedTextColor.GREEN));
+            }
+            case "purgeholograms" -> {
+                int purged = (plugin.getHologramManager() != null) ? plugin.getHologramManager().purgeAllOrphanedHolograms() : 0;
+                for (RaceArena arena : plugin.getArenas().values()) {
+                    Location lb = arena.getLeaderboardLocation();
+                    if (lb != null && lb.getWorld() != null && lb.getWorld().isChunkLoaded(lb.getBlockX() >> 4, lb.getBlockZ() >> 4)) {
+                        arena.updateLeaderboardHologram();
+                    }
+                }
+                p.sendMessage(Component.text("Leaderboard holograms refreshed! Purged " + purged + " duplicate/ghost display(s).", NamedTextColor.GREEN));
             }
             default -> p.sendMessage(Component.text("Unknown admin action.", NamedTextColor.RED));
         }

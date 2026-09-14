@@ -115,7 +115,7 @@ public class Utils {
         return t;
     }
 
-    // --- BOAT SPAWNING (Paper 1.21+ / 26.2 compatible) ---
+    // BOAT SPAWNING (Paper 1.21+ / 26.2 compatible)
     private static final org.bukkit.entity.EntityType[] BOAT_TYPES = {
             org.bukkit.entity.EntityType.OAK_BOAT,
             org.bukkit.entity.EntityType.SPRUCE_BOAT,
@@ -146,7 +146,7 @@ public class Utils {
                 || mat == org.bukkit.Material.FROSTED_ICE;
     }
 
-    // --- TIME FORMATTING (Zero-allocation string building) ---
+    // TIME FORMATTING (Zero-allocation string building)
     public static String formatTime(long millis) {
         long totalSeconds = millis / 1000;
         long minutes = totalSeconds / 60;
@@ -162,7 +162,7 @@ public class Utils {
         return sb.toString();
     }
 
-    // --- ZERO-ALLOCATION KINEMATIC GEOMETRY ---
+    // ZERO-ALLOCATION KINEMATIC GEOMETRY
     public static boolean lineSegmentIntersectsSphere(Location p1, Location p2, Location sphereCenter, double radius) {
         if (p1 == null || p2 == null || sphereCenter == null)
             return false;
@@ -195,7 +195,7 @@ public class Utils {
         return (t1 >= 0.0 && t1 <= 1.0) || (t2 >= 0.0 && t2 <= 1.0);
     }
 
-    // --- TRAIL LOGIC WITH ALL NEW TRAILS ---
+    // TRAIL LOGIC WITH ALL NEW TRAILS
     public static void spawnTrailParticles(Player p, Boat boat, TrailType trail) {
         if (boat == null || boat.isDead())
             return;

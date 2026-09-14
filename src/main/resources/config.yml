@@ -2,7 +2,7 @@
 # IceBoatRacing Configuration
 # ================================
 
-# ======== CORE SETTINGS ========
+# CORE SETTINGS
 settings:
   # Radius for checkpoint detection (in blocks)
   checkpoint-radius: 25.0
@@ -10,7 +10,7 @@ settings:
   # Discord webhook URL for race notifications (leave empty to disable)
   discord-webhook-url: ""
 
-# ======== MUSIC SETTINGS ========
+# MUSIC SETTINGS
 music:
   enabled: true
   sound-name: "minecraft:coconutmallmariokartwiiostfourone"
@@ -18,7 +18,7 @@ music:
   volume: 10000.0
   pitch: 1.0
 
-# ======== REPLAY SETTINGS ========
+# REPLAY SETTINGS
 replay:
   # Enable race replay recording
   enabled: true
@@ -27,7 +27,7 @@ replay:
   # Recording interval in ticks (2 = 10fps, lower = more detail but larger files)
   record-interval-ticks: 2
 
-# ======== PARTY SETTINGS ========
+# PARTY SETTINGS
 party:
   # Maximum players in a party
   max-size: 8
@@ -38,14 +38,14 @@ party:
   # Auto-join party members to arena when leader joins
   auto-join: true
 
-# ======== ELIMINATION MODE ========
+# ELIMINATION MODE
 elimination:
   # Sound played when player is eliminated
   elimination-sound: "ENTITY_WITHER_DEATH"
   # Eliminated players become spectators
   spectate-after-elimination: true
 
-# ======== VICTORY CELEBRATIONS ========
+# VICTORY CELEBRATIONS
 victory:
   # Number of fireworks to spawn on winner
   firework-count: 5
@@ -68,14 +68,14 @@ victory:
     3:
       - "eco give %player% 100"
 
-# ======== TRAILS SETTINGS ========
+# TRAILS SETTINGS
 trails:
   # Default trail for new players (NONE, SMOKE, FLAME, etc.)
   default: "SMOKE"
   # Particle spawn rate (higher = more particles, but more lag)
   particle-rate: 3
 
-# ======== DISCORD INTEGRATION ========
+# DISCORD INTEGRATION
 discord:
   # Send race results to webhook
   send-results: true
@@ -86,14 +86,14 @@ discord:
   # Embed color (decimal format, e.g., 5814783 for ice blue)
   embed-color: 5814783
 
-# ======== SPECTATOR SETTINGS ========
+# SPECTATOR SETTINGS
 spectator:
   # Default camera mode (FREE_FLY, FOLLOW_LEADER, FOLLOW_PLAYER, CINEMATIC)
   default-mode: "FREE_FLY"
   # Allow spectators to toggle between modes
   allow-mode-switch: true
 
-# ======== TITLES/NAMETAGS ========
+# TITLES/NAMETAGS
 titles:
   # Show title above racers
   show-above-player: true
@@ -107,7 +107,7 @@ titles:
   champion: 50     # 50+ wins
   legend: 100      # 100+ wins
 
-# ======== STARTING GRID ========
+# STARTING GRID
 starting-grid:
   # Countdown duration in seconds
   countdown-seconds: 5

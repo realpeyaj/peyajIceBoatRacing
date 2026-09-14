@@ -309,7 +309,7 @@ public class GUIManager implements Listener {
         p.openInventory(inv);
     }
 
-    // --- HELPER: GIVE BOOK ---
+    // HELPER: GIVE BOOK
     private void giveSetupBook(Player p) {
         ItemStack book = new ItemStack(Material.WRITTEN_BOOK);
         BookMeta meta = (BookMeta) book.getItemMeta();
@@ -348,7 +348,7 @@ public class GUIManager implements Listener {
         p.sendMessage(Component.text("You received the Setup Guide!", NamedTextColor.GREEN));
     }
 
-    // --- EVENT HANDLING ---
+    // EVENT HANDLING
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent e) {

@@ -100,7 +100,7 @@ public class RaceArena {
         this.plugin = plugin;
     }
 
-    // --- GETTERS & SETTERS ---
+    // GETTERS & SETTERS
     public String getName() {
         return name;
     }
@@ -174,8 +174,23 @@ public class RaceArena {
     }
 
     public void setLeaderboardLocation(Location loc) {
-        this.leaderboardLocation = loc;
-        updateLeaderboardHologram();
+        setLeaderboardLocation(loc, true);
+    }
+
+    public void setLeaderboardLocation(Location loc, boolean updateHologram) {
+        Location oldLoc = this.leaderboardLocation;
+        this.leaderboardLocation = (loc != null) ? loc.clone() : null;
+        if (updateHologram && plugin.getHologramManager() != null) {
+            String holoName = "race_lb_" + name;
+            if (this.leaderboardLocation == null) {
+                plugin.getHologramManager().removeHologram(holoName);
+                if (oldLoc != null) {
+                    plugin.getHologramManager().cleanUpHologramAt(holoName, oldLoc);
+                }
+            } else {
+                updateLeaderboardHologram(oldLoc);
+            }
+        }
     }
 
     public boolean isSpectator(UUID uuid) {
@@ -220,42 +235,59 @@ public class RaceArena {
         }
     }
 
-    // --- HOLOGRAMS ---
+    // HOLOGRAMS
     public void updateLeaderboardHologram() {
+        updateLeaderboardHologram(null);
+    }
+
+    public void updateLeaderboardHologram(Location oldLoc) {
         if (leaderboardLocation == null || plugin.getHologramManager() == null)
             return;
         try {
             String holoName = "race_lb_" + name;
-            List<String> lines = new ArrayList<>();
-            lines.add("&b&l❄ " + name.toUpperCase() + " LEADERBOARD ❄");
-            lines.add("&7------------------------");
-            List<Map.Entry<UUID, Long>> sorted = new ArrayList<>(bestTimes.entrySet());
-            sorted.sort(Map.Entry.comparingByValue());
-            int limit = Math.min(sorted.size(), 10);
-            for (int i = 0; i < limit; i++) {
-                UUID uuid = sorted.get(i).getKey();
-                long time = sorted.get(i).getValue();
-                OfflinePlayer op = Bukkit.getOfflinePlayer(uuid);
-                String pName = (op.getName() != null) ? op.getName() : "Unknown";
-                String color = (i == 0) ? "&e" : (i == 1) ? "&f" : (i == 2) ? "&6" : "&7";
-                lines.add(color + (i + 1) + ". &f" + pName + " &7- &b" + Utils.formatTime(time));
+            List<String> lines = getLeaderboardLines();
+            if (oldLoc != null && !oldLoc.equals(leaderboardLocation)) {
+                plugin.getHologramManager().moveOrUpdateHologram(holoName, oldLoc, leaderboardLocation, lines);
+            } else {
+                plugin.getHologramManager().createOrUpdateHologram(holoName, leaderboardLocation, lines);
             }
-            if (limit == 0)
-                lines.add("&7No records yet!");
-            lines.add("&7------------------------");
-            plugin.getHologramManager().createOrUpdateHologram(holoName, leaderboardLocation, lines);
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to update leaderboard hologram for " + name + ": " + e.getMessage());
         }
     }
 
+    public List<String> getLeaderboardLines() {
+        List<String> lines = new ArrayList<>();
+        lines.add("&b&l❄ " + name.toUpperCase() + " LEADERBOARD ❄");
+        lines.add("&7------------------------");
+        List<Map.Entry<UUID, Long>> sorted = new ArrayList<>(bestTimes.entrySet());
+        sorted.sort(Map.Entry.comparingByValue());
+        int limit = Math.min(sorted.size(), 10);
+        for (int i = 0; i < limit; i++) {
+            UUID uuid = sorted.get(i).getKey();
+            long time = sorted.get(i).getValue();
+            OfflinePlayer op = Bukkit.getOfflinePlayer(uuid);
+            String pName = (op.getName() != null) ? op.getName() : "Unknown";
+            String color = (i == 0) ? "&e" : (i == 1) ? "&f" : (i == 2) ? "&6" : "&7";
+            lines.add(color + (i + 1) + ". &f" + pName + " &7- &b" + Utils.formatTime(time));
+        }
+        if (limit == 0)
+            lines.add("&7No records yet!");
+        lines.add("&7------------------------");
+        return lines;
+    }
+
     public void deleteLeaderboardHologram() {
         if (plugin.getHologramManager() != null) {
-            plugin.getHologramManager().removeHologram("race_lb_" + name);
+            String holoName = "race_lb_" + name;
+            plugin.getHologramManager().removeHologram(holoName);
+            if (leaderboardLocation != null) {
+                plugin.getHologramManager().cleanUpHologramAt(holoName, leaderboardLocation);
+            }
         }
     }
 
-    // --- PLAYER MANAGEMENT ---
+    // PLAYER MANAGEMENT
     public void addPlayer(Player p) {
         addPlayer(p, false);
     }
@@ -464,7 +496,7 @@ public class RaceArena {
         }
     }
 
-    // --- GAME LOOP ---
+    // GAME LOOP
     public void startRace() {
         startRace(false);
     }
@@ -815,7 +847,7 @@ public class RaceArena {
         }
     }
 
-    // --- LOGIC HELPERS ---
+    // LOGIC HELPERS
     private boolean checkObjectivesAlongPath(Player p, UUID uuid, Location from, Location to) {
         int currentCpIndex = playerCheckpoints.getOrDefault(uuid, 0);
         Location cpTarget = null;

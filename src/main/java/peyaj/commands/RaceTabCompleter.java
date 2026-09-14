@@ -54,7 +54,7 @@ public class RaceTabCompleter implements TabCompleter {
                 case "admin" -> {
                     if (sender.hasPermission("race.admin")) {
                         return filterCompletions(Arrays.asList(
-                                "wand", "startvote", "delete", "visualize", "reload", "setmainlobby"), args[1]);
+                                "wand", "startvote", "delete", "visualize", "reload", "setmainlobby", "purgeholograms"), args[1]);
                     }
                 }
                 case "replay" -> {

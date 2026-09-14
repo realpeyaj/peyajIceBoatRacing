@@ -40,23 +40,23 @@ public class IceBoatRacing extends JavaPlugin {
     private final Map<String, RaceArena> arenas = new HashMap<>();
     private final Map<UUID, String> playerArenaMap = new ConcurrentHashMap<>();
 
-    // --- EDITOR & INPUT DATA ---
+    // EDITOR & INPUT DATA
     public final Map<UUID, String> editorArena = new HashMap<>();
     public final Map<UUID, EditMode> editorMode = new HashMap<>();
     public final Map<UUID, String> activeVisualizers = new HashMap<>();
     public final Map<UUID, String> inputMode = new HashMap<>();
 
-    // --- COSMETICS DATA ---
+    // COSMETICS DATA
     private final Map<UUID, Material> playerCagePreference = new HashMap<>();
     private final Map<UUID, TrailType> playerTrailPreference = new HashMap<>();
 
-    // --- VOTING DATA ---
+    // VOTING DATA
     public boolean isVoting = false;
     public int votingTimeRemaining = 0;
     private BukkitTask votingTask;
     public final Map<UUID, String> playerVotes = new HashMap<>();
 
-    // --- CONFIGS ---
+    // CONFIGS
     private File messagesFile;
     private FileConfiguration messagesConfig;
     private File statsFile;
@@ -64,13 +64,13 @@ public class IceBoatRacing extends JavaPlugin {
     private File arenasFile;
     private FileConfiguration arenasConfig;
 
-    // --- MANAGERS ---
+    // MANAGERS
     public GUIManager guiManager;
     public ReplayManager replayManager;
     public DiscordWebhook discordWebhook;
     public HologramManager hologramManager;
 
-    // --- SETTINGS ---
+    // SETTINGS
     public double checkpointRadius = 25.0;
     public String discordWebhookUrl = "";
 
@@ -117,6 +117,9 @@ public class IceBoatRacing extends JavaPlugin {
         }
 
         loadArenas();
+        if (hologramManager != null) {
+            hologramManager.purgeAllOrphanedHolograms();
+        }
 
         // Initialize managers
         guiManager = new GUIManager(this);
@@ -199,11 +202,19 @@ public class IceBoatRacing extends JavaPlugin {
         reloadConfig();
         loadConfigSettings();
         loadMessages();
+        if (hologramManager != null) {
+            hologramManager.removeAll();
+        }
+        arenas.clear();
         loadArenasConfig();
+        loadArenas();
+        if (hologramManager != null) {
+            hologramManager.purgeAllOrphanedHolograms();
+        }
         getLogger().info("Configuration reloaded.");
     }
 
-    // --- VOTING LOGIC ---
+    // VOTING LOGIC
 
     public void startVotingRound(int durationSeconds) {
         if (isVoting)
@@ -316,7 +327,7 @@ public class IceBoatRacing extends JavaPlugin {
         }
     }
 
-    // --- CONFIG HELPERS ---
+    // CONFIG HELPERS
     private void loadArenasConfig() {
         arenasFile = new File(getDataFolder(), "arenas.yml");
         if (!arenasFile.exists()) {
@@ -381,7 +392,7 @@ public class IceBoatRacing extends JavaPlugin {
         return statsConfig.getInt(uuid.toString() + "." + stat, 0);
     }
 
-    // --- COSMETICS ---
+    // COSMETICS
     public Material getPlayerCagePreference(UUID uuid) {
         return playerCagePreference.getOrDefault(uuid, Material.GLASS);
     }
@@ -398,7 +409,7 @@ public class IceBoatRacing extends JavaPlugin {
         playerTrailPreference.put(uuid, trail);
     }
 
-    // --- ARENA MANAGEMENT ---
+    // ARENA MANAGEMENT
     public RaceArena getArena(String name) {
         return arenas.get(name.toLowerCase());
     }
@@ -436,7 +447,7 @@ public class IceBoatRacing extends JavaPlugin {
         return playerArenaMap.containsKey(uuid);
     }
 
-    // --- SAVE LOGIC (ARENAS.YML) ---
+    // SAVE LOGIC (ARENAS.YML)
     public void saveArenas() {
         getConfig().set("settings.checkpoint-radius", checkpointRadius);
         getConfig().set("settings.discord-webhook-url", discordWebhookUrl);
@@ -532,7 +543,7 @@ public class IceBoatRacing extends JavaPlugin {
 
             arena.setLobby(arenasConfig.getLocation(path + ".lobby"));
             arena.setMainLobby(arenasConfig.getLocation(path + ".mainlobby"));
-            arena.setLeaderboardLocation(arenasConfig.getLocation(path + ".leaderboard"));
+            arena.setLeaderboardLocation(arenasConfig.getLocation(path + ".leaderboard"), false);
 
             arena.setFinishLine(
                     arenasConfig.getLocation(path + ".finish1"),
@@ -563,7 +574,10 @@ public class IceBoatRacing extends JavaPlugin {
             }
 
             arenas.put(key.toLowerCase(), arena);
-            arena.updateLeaderboardHologram();
+            Location lb = arena.getLeaderboardLocation();
+            if (lb != null && lb.getWorld() != null && lb.getWorld().isChunkLoaded(lb.getBlockX() >> 4, lb.getBlockZ() >> 4)) {
+                arena.updateLeaderboardHologram();
+            }
             getLogger().info("Loaded arena: " + key);
         }
     }

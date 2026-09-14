@@ -15,7 +15,6 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 
 public class Hologram {
@@ -26,12 +25,13 @@ public class Hologram {
     private Location location;
     private List<String> lines = new ArrayList<>();
     private UUID textDisplayUuid;
+    private Component cachedComponent = null;
 
     public Hologram(JavaPlugin plugin, String id, Location location) {
         this.plugin = plugin;
         this.id = id;
         this.key = new NamespacedKey(plugin, "hologram_id");
-        this.location = location.clone();
+        this.location = (location != null) ? location.clone() : null;
     }
 
     public String getId() {
@@ -39,18 +39,30 @@ public class Hologram {
     }
 
     public Location getLocation() {
-        return location.clone();
+        return (location != null) ? location.clone() : null;
     }
 
-    private Component cachedComponent = null;
+    public NamespacedKey getKey() {
+        return key;
+    }
 
     public synchronized void setLocation(Location newLoc) {
         if (newLoc == null || newLoc.getWorld() == null) return;
         if (this.location != null && this.location.equals(newLoc)) return;
+
+        Location oldLoc = this.location;
         this.location = newLoc.clone();
-        TextDisplay display = getOrSpawnDisplay();
+
+        TextDisplay display = getDisplayEntity();
         if (display != null && display.isValid()) {
             display.teleport(this.location);
+        } else {
+            display = getOrSpawnDisplay();
+        }
+
+        // Clean up any rogue or duplicate displays at the old location
+        if (oldLoc != null && oldLoc.getWorld() != null) {
+            cleanUpNearby(oldLoc, 6.0);
         }
     }
 
@@ -59,13 +71,24 @@ public class Hologram {
         if (this.lines.equals(newLines) && cachedComponent != null) return;
         this.lines = newLines;
         this.cachedComponent = buildComponent(this.lines);
-        TextDisplay display = getOrSpawnDisplay();
+        TextDisplay display = getDisplayEntity();
         if (display != null && display.isValid()) {
             display.text(this.cachedComponent);
         }
     }
 
     public synchronized void remove() {
+        TextDisplay display = getDisplayEntity();
+        if (display != null && display.isValid()) {
+            display.remove();
+        }
+        textDisplayUuid = null;
+        if (location != null && location.getWorld() != null) {
+            cleanUpNearby(location, 6.0);
+        }
+    }
+
+    public synchronized void onChunkUnload() {
         TextDisplay display = getDisplayEntity();
         if (display != null && display.isValid()) {
             display.remove();
@@ -78,35 +101,34 @@ public class Hologram {
             return null;
         }
 
+        // Do NOT force-load chunks if unloaded; wait for ChunkLoadEvent
+        if (!location.getWorld().isChunkLoaded(location.getBlockX() >> 4, location.getBlockZ() >> 4)) {
+            return null;
+        }
+
         // Try getting existing entity from stored UUID
-        if (textDisplayUuid != null) {
-            Entity entity = Bukkit.getEntity(textDisplayUuid);
-            if (entity instanceof TextDisplay textDisplay && textDisplay.isValid()) {
-                return textDisplay;
-            }
+        TextDisplay existing = getDisplayEntity();
+        if (existing != null && existing.isValid()) {
+            return existing;
         }
 
-        // Search for existing tagged TextDisplay entity near the location
-        for (Entity nearby : location.getWorld().getNearbyEntities(location, 2.0, 2.0, 2.0)) {
-            if (nearby instanceof TextDisplay textDisplay) {
-                String taggedId = textDisplay.getPersistentDataContainer().get(key, PersistentDataType.STRING);
-                if (Objects.equals(taggedId, id)) {
-                    textDisplayUuid = textDisplay.getUniqueId();
-                    textDisplay.setSeeThrough(true);
-                    return textDisplay;
-                }
-            }
-        }
+        // Clean up any stale, legacy, or duplicate TextDisplays near this location before spawning
+        cleanUpNearby(location, 4.0);
 
-        // Spawn new TextDisplay entity
+        // Spawn a fresh non-persistent TextDisplay entity
         try {
             TextDisplay display = (TextDisplay) location.getWorld().spawnEntity(location, EntityType.TEXT_DISPLAY);
-            display.getPersistentDataContainer().set(key, PersistentDataType.STRING, id);
+            // Non-persistent ensures Paper/Minecraft NEVER writes this entity to chunk region files on disk.
+            display.setPersistent(false);
+            display.getPersistentDataContainer().set(key, PersistentDataType.STRING, id.toLowerCase());
             display.setBillboard(Display.Billboard.CENTER);
             display.setShadowed(true);
-            display.setBackgroundColor(Color.fromARGB(100, 0, 0, 0)); // Sleek semi-transparent dark background
-            display.setSeeThrough(true); // Ensures clear rendering through translucent blocks (ice, water, glass)
-            display.text(buildComponent(lines));
+            display.setBackgroundColor(Color.fromARGB(100, 0, 0, 0));
+            display.setSeeThrough(true);
+            if (cachedComponent == null) {
+                cachedComponent = buildComponent(lines);
+            }
+            display.text(cachedComponent);
             this.textDisplayUuid = display.getUniqueId();
             return display;
         } catch (Exception e) {
@@ -115,10 +137,33 @@ public class Hologram {
         }
     }
 
-    private TextDisplay getDisplayEntity() {
+    public void cleanUpNearby(Location loc, double radius) {
+        if (loc == null || loc.getWorld() == null) return;
+        if (!loc.getWorld().isChunkLoaded(loc.getBlockX() >> 4, loc.getBlockZ() >> 4)) return;
+
+        try {
+            for (Entity nearby : loc.getWorld().getNearbyEntities(loc, radius, radius, radius)) {
+                if (nearby instanceof TextDisplay td) {
+                    String taggedId = td.getPersistentDataContainer().get(key, PersistentDataType.STRING);
+                    if (id.equalsIgnoreCase(taggedId)) {
+                        // Keep our active entity only if it is at the current target location
+                        if (textDisplayUuid != null && td.getUniqueId().equals(textDisplayUuid)
+                                && location != null && td.getWorld().equals(location.getWorld())
+                                && td.getLocation().distanceSquared(location) < 1.0) {
+                            continue;
+                        }
+                        td.remove();
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    public TextDisplay getDisplayEntity() {
         if (textDisplayUuid != null) {
             Entity entity = Bukkit.getEntity(textDisplayUuid);
-            if (entity instanceof TextDisplay textDisplay) {
+            if (entity instanceof TextDisplay textDisplay && textDisplay.isValid()) {
                 return textDisplay;
             }
         }
