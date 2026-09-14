@@ -21,6 +21,7 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.vehicle.VehicleBlockCollisionEvent;
 import org.bukkit.event.vehicle.VehicleMoveEvent;
+import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.util.Vector;
@@ -49,6 +50,25 @@ public class RaceListener implements Listener {
         ItemStack clicked = e.getCurrentItem();
         if (clicked == null || clicked.getItemMeta() == null)
             return;
+
+        if (clicked.getType() == Material.COMPASS) {
+            boolean isRaceMenu = false;
+            if (clicked.getItemMeta().getPersistentDataContainer().has(new NamespacedKey(plugin, "race_menu"), PersistentDataType.BYTE)) {
+                isRaceMenu = true;
+            } else if (clicked.getItemMeta().displayName() != null) {
+                String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                        .serialize(clicked.getItemMeta().displayName());
+                if (plain.contains("Race Menu")) {
+                    isRaceMenu = true;
+                }
+            }
+            if (isRaceMenu) {
+                e.setCancelled(true);
+                p.closeInventory();
+                plugin.guiManager.openMainMenu(p);
+                return;
+            }
+        }
 
         if (clicked.getType() == Material.RED_DYE) {
             String displayName = clicked.getItemMeta().displayName() != null
@@ -173,8 +193,19 @@ public class RaceListener implements Listener {
     public void onBoatMove(VehicleMoveEvent e) {
         if (!(e.getVehicle() instanceof Boat boat))
             return;
-        if (boat.getPassengers().isEmpty() || !(boat.getPassengers().get(0) instanceof Player))
+        if (boat.getPassengers().isEmpty() || !(boat.getPassengers().get(0) instanceof Player p))
             return;
+
+        RaceArena arena = plugin.getPlayerArena(p.getUniqueId());
+        if (arena != null && arena.getState() == RaceState.STARTING) {
+            boat.setVelocity(new Vector(0, 0, 0));
+            Location from = e.getFrom();
+            Location to = e.getTo();
+            if (from.getX() != to.getX() || from.getZ() != to.getZ() || from.getY() != to.getY()) {
+                boat.teleport(from);
+            }
+            return;
+        }
 
         // Ensure step height is set for Paper native smooth stepping
         try {
@@ -283,7 +314,7 @@ public class RaceListener implements Listener {
         RaceArena arena = plugin.getPlayerArena(p.getUniqueId());
         if (arena == null)
             return;
-        if (arena.getState() == RaceState.ACTIVE && !arena.isSpectator(p.getUniqueId())) {
+        if ((arena.getState() == RaceState.ACTIVE || arena.getState() == RaceState.STARTING) && !arena.isSpectator(p.getUniqueId())) {
             e.setCancelled(true);
         }
     }
@@ -337,6 +368,25 @@ public class RaceListener implements Listener {
             e.setCancelled(true);
             handleWand(p, e.getAction(), e.getClickedBlock());
             return;
+        }
+
+        // Check for race menu compass
+        if (item.getType() == Material.COMPASS && (e.getAction() == Action.RIGHT_CLICK_AIR || e.getAction() == Action.RIGHT_CLICK_BLOCK)) {
+            boolean isRaceMenu = false;
+            if (item.getItemMeta().getPersistentDataContainer().has(new NamespacedKey(plugin, "race_menu"), PersistentDataType.BYTE)) {
+                isRaceMenu = true;
+            } else if (item.getItemMeta().displayName() != null) {
+                String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                        .serialize(item.getItemMeta().displayName());
+                if (plain.contains("Race Menu")) {
+                    isRaceMenu = true;
+                }
+            }
+            if (isRaceMenu) {
+                e.setCancelled(true);
+                plugin.guiManager.openMainMenu(p);
+                return;
+            }
         }
 
         // Check for reset run item

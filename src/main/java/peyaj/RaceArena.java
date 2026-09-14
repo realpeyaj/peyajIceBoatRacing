@@ -6,11 +6,13 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.kyori.adventure.title.Title;
 import org.bukkit.*;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Boat;
 import org.bukkit.entity.Firework;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.FireworkMeta;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.*;
@@ -71,6 +73,14 @@ public class RaceArena {
     // Leaderboard Data
     public final Map<UUID, Long> bestTimes = new HashMap<>();
 
+    // Player Inventory Backups
+    private final Map<UUID, ItemStack[]> savedInventories = new HashMap<>();
+    private final Map<UUID, ItemStack[]> savedArmor = new HashMap<>();
+    private final Map<UUID, ItemStack> savedOffHand = new HashMap<>();
+    private final Map<UUID, Integer> savedLevels = new HashMap<>();
+    private final Map<UUID, Float> savedExp = new HashMap<>();
+    private final Map<UUID, GameMode> savedGameModes = new HashMap<>();
+
     // Ghost & Replay
     private final Map<UUID, GhostData> currentRecordings = new HashMap<>();
     private GhostData bestGhost = null;
@@ -118,7 +128,12 @@ public class RaceArena {
     }
 
     public void setTotalLaps(int laps) {
-        this.totalLaps = laps;
+        this.totalLaps = Math.max(1, laps);
+        if (this.totalLaps > 1 && this.type == RaceType.DEFAULT) {
+            this.type = RaceType.LAP;
+        } else if (this.totalLaps == 1 && this.type == RaceType.LAP) {
+            this.type = RaceType.DEFAULT;
+        }
     }
 
     public Location getLobby() {
@@ -308,6 +323,7 @@ public class RaceArena {
             timeTrial = false;
         }
 
+        savePlayerInventory(p);
         players.add(p.getUniqueId());
         plugin.setPlayerArena(p.getUniqueId(), name);
         if (lobby != null && lobby.getWorld() != null) {
@@ -328,6 +344,7 @@ public class RaceArena {
     }
 
     public void addSpectator(Player p) {
+        savePlayerInventory(p);
         spectators.add(p.getUniqueId());
         spectatorModes.put(p.getUniqueId(), SpectatorMode.FREE_FLY);
         p.setGameMode(GameMode.SPECTATOR);
@@ -383,10 +400,12 @@ public class RaceArena {
     }
 
     private void giveLobbyItems(Player p, boolean isTimeTrial) {
+        p.getInventory().clear();
         ItemStack compass = new ItemStack(Material.COMPASS);
         var meta = compass.getItemMeta();
         meta.displayName(Component.text("Race Menu", NamedTextColor.AQUA));
         meta.lore(List.of(Component.text("Right Click to open", NamedTextColor.GRAY)));
+        meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "race_menu"), PersistentDataType.BYTE, (byte) 1);
         compass.setItemMeta(meta);
         p.getInventory().setItem(4, compass);
 
@@ -434,9 +453,8 @@ public class RaceArena {
             spectators.remove(p.getUniqueId());
             spectatorModes.remove(p.getUniqueId());
             spectatorTargets.remove(p.getUniqueId());
-            p.setGameMode(GameMode.SURVIVAL);
-            p.getInventory().clear();
             p.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
+            restorePlayerInventory(p);
             if (mainLobby != null && mainLobby.getWorld() != null)
                 p.teleport(mainLobby);
             else if (p.getWorld() != null)
@@ -454,9 +472,9 @@ public class RaceArena {
         }
         currentRecordings.remove(p.getUniqueId());
         checkpointTimestamps.remove(p.getUniqueId());
-        p.getInventory().clear();
         stopMusic(p);
         p.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
+        restorePlayerInventory(p);
         if (mainLobby != null && mainLobby.getWorld() != null)
             p.teleport(mainLobby);
         else if (p.getWorld() != null)
@@ -674,8 +692,7 @@ public class RaceArena {
             Player p = Bukkit.getPlayer(uuid);
             if (p != null) {
                 p.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
-                p.setGameMode(GameMode.SURVIVAL);
-                p.getInventory().clear();
+                restorePlayerInventory(p);
                 if (mainLobby != null && mainLobby.getWorld() != null)
                     p.teleport(mainLobby);
                 else if (p.getWorld() != null)
@@ -688,8 +705,7 @@ public class RaceArena {
             Player p = Bukkit.getPlayer(uuid);
             if (p != null) {
                 p.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
-                p.setGameMode(GameMode.SURVIVAL);
-                p.getInventory().clear();
+                restorePlayerInventory(p);
                 if (mainLobby != null && mainLobby.getWorld() != null)
                     p.teleport(mainLobby);
                 else if (p.getWorld() != null)
@@ -890,7 +906,7 @@ public class RaceArena {
     }
 
     private void handleFinishLineHit(Player p, UUID uuid) {
-        if (type == RaceType.LAP || type == RaceType.ELIMINATION) {
+        if (totalLaps > 1 || type == RaceType.LAP || type == RaceType.ELIMINATION) {
             int lap = playerLaps.getOrDefault(uuid, 1);
             if (lap < totalLaps) {
                 playerLaps.put(uuid, lap + 1);
@@ -1195,24 +1211,114 @@ public class RaceArena {
 
     private void createCage(Location spawn, UUID uuid) {
         Material cageMat = plugin.getPlayerCagePreference(uuid);
-        for (int x = -2; x <= 2; x++)
-            for (int z = -2; z <= 2; z++)
+        Location base = spawn.clone();
+        for (int x = -1; x <= 1; x++) {
+            for (int z = -1; z <= 1; z++) {
                 for (int y = 0; y <= 2; y++) {
-                    if (Math.abs(x) <= 1 && Math.abs(z) <= 1)
+                    // Center space for the boat and rider
+                    if (y < 2 && x == 0 && z == 0) {
                         continue;
-                    Location b = spawn.clone().add(x, y, z);
-                    if (b.getBlock().getType() == Material.AIR) {
-                        b.getBlock().setType(cageMat);
+                    }
+                    Location b = base.clone().add(x, y, z);
+                    Block block = b.getBlock();
+                    if (block.isEmpty() || block.isPassable()) {
+                        block.setType(cageMat);
                         glassBlocks.add(b);
                     }
                 }
+            }
+        }
     }
 
     private void removeCages() {
-        for (Location l : glassBlocks)
-            if (l.getBlock().getType().name().contains("GLASS"))
+        for (Location l : glassBlocks) {
+            if (l.getWorld() != null) {
                 l.getBlock().setType(Material.AIR);
+            }
+        }
         glassBlocks.clear();
+    }
+
+    public void savePlayerInventory(Player p) {
+        if (p == null) return;
+        UUID uuid = p.getUniqueId();
+        if (savedInventories.containsKey(uuid)) return;
+
+        savedInventories.put(uuid, cloneItemArray(p.getInventory().getContents()));
+        savedArmor.put(uuid, cloneItemArray(p.getInventory().getArmorContents()));
+        ItemStack offHand = p.getInventory().getItemInOffHand();
+        savedOffHand.put(uuid, (offHand != null && offHand.getType() != Material.AIR) ? offHand.clone() : null);
+        savedLevels.put(uuid, p.getLevel());
+        savedExp.put(uuid, p.getExp());
+        savedGameModes.put(uuid, p.getGameMode());
+    }
+
+    public void restorePlayerInventory(Player p) {
+        if (p == null) return;
+        UUID uuid = p.getUniqueId();
+        if (!savedInventories.containsKey(uuid)) {
+            removeRaceItems(p);
+            return;
+        }
+
+        p.getInventory().clear();
+        ItemStack[] contents = savedInventories.remove(uuid);
+        ItemStack[] armor = savedArmor.remove(uuid);
+        ItemStack offHand = savedOffHand.remove(uuid);
+        Integer level = savedLevels.remove(uuid);
+        Float exp = savedExp.remove(uuid);
+        GameMode gm = savedGameModes.remove(uuid);
+
+        applyInventory(p, contents, armor, offHand, level, exp, gm);
+
+        // Deferred application fallback in case Multiverse-Inventories resets inventory on world teleport
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (p.isOnline()) {
+                applyInventory(p, contents, armor, offHand, level, exp, gm);
+            }
+        }, 2L);
+    }
+
+    private void applyInventory(Player p, ItemStack[] contents, ItemStack[] armor, ItemStack offHand, Integer level, Float exp, GameMode gm) {
+        if (p == null || !p.isOnline()) return;
+        if (contents != null) p.getInventory().setContents(cloneItemArray(contents));
+        if (armor != null) p.getInventory().setArmorContents(cloneItemArray(armor));
+        if (offHand != null) p.getInventory().setItemInOffHand(offHand.clone());
+        if (level != null) p.setLevel(level);
+        if (exp != null) p.setExp(exp);
+        if (gm != null) p.setGameMode(gm);
+        p.updateInventory();
+    }
+
+    private void removeRaceItems(Player p) {
+        if (p == null || !p.isOnline()) return;
+        for (int i = 0; i < p.getInventory().getSize(); i++) {
+            ItemStack item = p.getInventory().getItem(i);
+            if (item == null || item.getType() == Material.AIR) continue;
+            if (item.getType() == Material.COMPASS || item.getType() == Material.RED_DYE || item.getType() == Material.BARRIER || item.getType() == Material.CLOCK) {
+                if (item.hasItemMeta()) {
+                    var meta = item.getItemMeta();
+                    if (meta.getPersistentDataContainer().has(new NamespacedKey(plugin, "race_menu"), PersistentDataType.BYTE)) {
+                        p.getInventory().setItem(i, null);
+                    } else if (meta.displayName() != null) {
+                        String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                                .serialize(meta.displayName());
+                        if (plain.contains("Race Menu") || plain.contains("Reset Run") || plain.contains("Spectator") || plain.contains("Leave")) {
+                            p.getInventory().setItem(i, null);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private ItemStack[] cloneItemArray(ItemStack[] original) {
+        if (original == null) return new ItemStack[0];
+        ItemStack[] copy = new ItemStack[original.length];
+        for (int i = 0; i < original.length; i++) {
+            copy[i] = (original[i] != null && original[i].getType() != Material.AIR) ? original[i].clone() : null;
+        }
+        return copy;
     }
 
     private void syncGhostMode() {
