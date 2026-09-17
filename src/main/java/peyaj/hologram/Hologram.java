@@ -78,6 +78,7 @@ public class Hologram {
             display = getOrSpawnDisplay();
         }
         if (display != null && display.isValid()) {
+            display.setBackgroundColor(Color.fromARGB(0, 0, 0, 0));
             display.text(this.cachedComponent);
         }
     }
@@ -139,7 +140,7 @@ public class Hologram {
             display.getPersistentDataContainer().set(key, PersistentDataType.STRING, id.toLowerCase());
             display.setBillboard(Display.Billboard.CENTER);
             display.setShadowed(true);
-            display.setBackgroundColor(Color.fromARGB(100, 0, 0, 0));
+            display.setBackgroundColor(Color.fromARGB(0, 0, 0, 0));
             display.setSeeThrough(true);
             display.setViewRange(2.0f);
             if (cachedComponent == null) {
