@@ -347,11 +347,20 @@ public class RaceArena {
         savePlayerInventory(p);
         spectators.add(p.getUniqueId());
         spectatorModes.put(p.getUniqueId(), SpectatorMode.FREE_FLY);
-        p.setGameMode(GameMode.SPECTATOR);
         if (!spawns.isEmpty())
             p.teleport(spawns.get(0));
         else if (lobby != null)
             p.teleport(lobby);
+
+        p.setGameMode(GameMode.SPECTATOR);
+
+        // Fallback for Multiverse-Core or other plugins that force world gamemode on world change
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (p.isOnline() && spectators.contains(p.getUniqueId())) {
+                p.setGameMode(GameMode.SPECTATOR);
+            }
+        }, 2L);
+
         p.sendMessage(
                 plugin.getMessage("arena-spectating").replaceText(b -> b.matchLiteral("{arena}").replacement(name)));
         p.showTitle(Title.title(Component.text("SPECTATING", NamedTextColor.GREEN),
@@ -393,6 +402,14 @@ public class RaceArena {
         SpectatorMode current = spectatorModes.getOrDefault(p.getUniqueId(), SpectatorMode.FREE_FLY);
         SpectatorMode next = current.next();
         spectatorModes.put(p.getUniqueId(), next);
+        if (next == SpectatorMode.FREE_FLY) {
+            try {
+                if (p.getGameMode() == GameMode.SPECTATOR) {
+                    p.setSpectatorTarget(null);
+                }
+            } catch (Exception ignored) {
+            }
+        }
         p.sendMessage(
                 Component.text("Camera mode: " + next.displayName + " - " + next.description, NamedTextColor.AQUA));
         p.playSound(p.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 1f);
@@ -450,6 +467,12 @@ public class RaceArena {
 
     public void removePlayer(Player p) {
         if (spectators.contains(p.getUniqueId())) {
+            try {
+                if (p.getGameMode() == GameMode.SPECTATOR) {
+                    p.setSpectatorTarget(null);
+                }
+            } catch (Exception ignored) {
+            }
             spectators.remove(p.getUniqueId());
             spectatorModes.remove(p.getUniqueId());
             spectatorTargets.remove(p.getUniqueId());
@@ -704,6 +727,12 @@ public class RaceArena {
         for (UUID uuid : spectators) {
             Player p = Bukkit.getPlayer(uuid);
             if (p != null) {
+                try {
+                    if (p.getGameMode() == GameMode.SPECTATOR) {
+                        p.setSpectatorTarget(null);
+                    }
+                } catch (Exception ignored) {
+                }
                 p.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
                 restorePlayerInventory(p);
                 if (mainLobby != null && mainLobby.getWorld() != null)
@@ -776,22 +805,38 @@ public class RaceArena {
             // Spectator camera logic
             for (UUID uuid : spectators) {
                 Player p = Bukkit.getPlayer(uuid);
-                if (p == null)
+                if (p == null || !p.isOnline())
                     continue;
+
+                // Ensure spectator is in SPECTATOR game mode (Multiverse world-change safety)
+                if (p.getGameMode() != GameMode.SPECTATOR) {
+                    p.setGameMode(GameMode.SPECTATOR);
+                    continue;
+                }
 
                 SpectatorMode mode = spectatorModes.getOrDefault(uuid, SpectatorMode.FREE_FLY);
                 if (mode == SpectatorMode.FOLLOW_LEADER && !ranking.isEmpty()) {
                     UUID leader = ranking.get(0);
                     Player leaderPlayer = Bukkit.getPlayer(leader);
-                    if (leaderPlayer != null) {
-                        p.setSpectatorTarget(leaderPlayer);
+                    if (leaderPlayer != null && leaderPlayer.isOnline() && !leaderPlayer.equals(p)) {
+                        try {
+                            if (p.getGameMode() == GameMode.SPECTATOR && (p.getSpectatorTarget() == null || !p.getSpectatorTarget().equals(leaderPlayer))) {
+                                p.setSpectatorTarget(leaderPlayer);
+                            }
+                        } catch (Exception ignored) {
+                        }
                     }
                 } else if (mode == SpectatorMode.FOLLOW_PLAYER) {
                     UUID target = spectatorTargets.get(uuid);
                     if (target != null) {
                         Player targetPlayer = Bukkit.getPlayer(target);
-                        if (targetPlayer != null && targetPlayer.isOnline()) {
-                            p.setSpectatorTarget(targetPlayer);
+                        if (targetPlayer != null && targetPlayer.isOnline() && !targetPlayer.equals(p)) {
+                            try {
+                                if (p.getGameMode() == GameMode.SPECTATOR && (p.getSpectatorTarget() == null || !p.getSpectatorTarget().equals(targetPlayer))) {
+                                    p.setSpectatorTarget(targetPlayer);
+                                }
+                            } catch (Exception ignored) {
+                            }
                         }
                     }
                 }

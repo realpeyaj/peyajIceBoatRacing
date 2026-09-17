@@ -44,18 +44,20 @@ public class HologramManager implements Listener {
         Hologram holo = holograms.computeIfAbsent(key, k -> new Hologram(plugin, id, location));
         holo.setLocation(location);
         holo.setLines(lines);
+        holo.ensureSpawned();
         return holo;
     }
 
     public Hologram moveOrUpdateHologram(String id, Location oldLoc, Location newLoc, List<String> lines) {
         if (id == null || newLoc == null) return null;
         String key = id.toLowerCase();
-        Hologram holo = holograms.computeIfAbsent(key, k -> new Hologram(plugin, id, newLoc));
-        holo.setLocation(newLoc);
         if (oldLoc != null && !oldLoc.equals(newLoc)) {
             cleanUpHologramAt(id, oldLoc);
         }
+        Hologram holo = holograms.computeIfAbsent(key, k -> new Hologram(plugin, id, newLoc));
+        holo.setLocation(newLoc);
         holo.setLines(lines);
+        holo.ensureSpawned();
         return holo;
     }
 
@@ -70,11 +72,17 @@ public class HologramManager implements Listener {
     public void cleanUpHologramAt(String id, Location loc) {
         if (id == null || loc == null || loc.getWorld() == null) return;
         if (!loc.getWorld().isChunkLoaded(loc.getBlockX() >> 4, loc.getBlockZ() >> 4)) return;
+        Hologram holo = getHologram(id);
+        java.util.UUID activeUuid = (holo != null) ? holo.getTextDisplayUuid() : null;
         try {
             for (Entity nearby : loc.getWorld().getNearbyEntities(loc, 6.0, 6.0, 6.0)) {
                 if (nearby instanceof TextDisplay td) {
                     String taggedId = td.getPersistentDataContainer().get(hologramKey, PersistentDataType.STRING);
                     if (id.equalsIgnoreCase(taggedId)) {
+                        // Protect active display entity from being deleted
+                        if (activeUuid != null && td.getUniqueId().equals(activeUuid)) {
+                            continue;
+                        }
                         td.remove();
                     }
                 }
@@ -132,14 +140,28 @@ public class HologramManager implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onEntitiesLoad(EntitiesLoadEvent event) {
+        Chunk chunk = event.getChunk();
         for (Entity entity : event.getEntities()) {
             if (entity instanceof TextDisplay td) {
                 String taggedId = td.getPersistentDataContainer().get(hologramKey, PersistentDataType.STRING);
                 if (taggedId != null && taggedId.toLowerCase().startsWith("race_lb_")) {
-                    // Any entity loaded from chunk disk files is either an old persistent
-                    // entity from v3.2.1 or an orphaned duplicate. Remove it to sanitize world save.
-                    td.remove();
+                    Hologram holo = getHologram(taggedId);
+                    if (holo != null && holo.getTextDisplayUuid() != null && td.getUniqueId().equals(holo.getTextDisplayUuid())) {
+                        continue; // Protect active in-memory hologram
+                    }
+                    if (td.isPersistent()) {
+                        td.remove();
+                    }
                 }
+            }
+        }
+        for (RaceArena arena : plugin.getArenas().values()) {
+            Location lbLoc = arena.getLeaderboardLocation();
+            if (lbLoc != null && lbLoc.getWorld() != null
+                    && lbLoc.getWorld().equals(chunk.getWorld())
+                    && (lbLoc.getBlockX() >> 4) == chunk.getX()
+                    && (lbLoc.getBlockZ() >> 4) == chunk.getZ()) {
+                arena.updateLeaderboardHologram();
             }
         }
     }

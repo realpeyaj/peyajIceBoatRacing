@@ -48,7 +48,10 @@ public class Hologram {
 
     public synchronized void setLocation(Location newLoc) {
         if (newLoc == null || newLoc.getWorld() == null) return;
-        if (this.location != null && this.location.equals(newLoc)) return;
+        if (this.location != null && this.location.equals(newLoc)) {
+            ensureSpawned();
+            return;
+        }
 
         Location oldLoc = this.location;
         this.location = newLoc.clone();
@@ -68,13 +71,26 @@ public class Hologram {
 
     public synchronized void setLines(List<String> lines) {
         List<String> newLines = (lines != null) ? new ArrayList<>(lines) : new ArrayList<>();
-        if (this.lines.equals(newLines) && cachedComponent != null) return;
         this.lines = newLines;
         this.cachedComponent = buildComponent(this.lines);
         TextDisplay display = getDisplayEntity();
+        if (display == null || !display.isValid()) {
+            display = getOrSpawnDisplay();
+        }
         if (display != null && display.isValid()) {
             display.text(this.cachedComponent);
         }
+    }
+
+    public synchronized void ensureSpawned() {
+        TextDisplay display = getDisplayEntity();
+        if (display == null || !display.isValid()) {
+            getOrSpawnDisplay();
+        }
+    }
+
+    public UUID getTextDisplayUuid() {
+        return textDisplayUuid;
     }
 
     public synchronized void remove() {
@@ -125,6 +141,7 @@ public class Hologram {
             display.setShadowed(true);
             display.setBackgroundColor(Color.fromARGB(100, 0, 0, 0));
             display.setSeeThrough(true);
+            display.setViewRange(2.0f);
             if (cachedComponent == null) {
                 cachedComponent = buildComponent(lines);
             }
@@ -146,10 +163,8 @@ public class Hologram {
                 if (nearby instanceof TextDisplay td) {
                     String taggedId = td.getPersistentDataContainer().get(key, PersistentDataType.STRING);
                     if (id.equalsIgnoreCase(taggedId)) {
-                        // Keep our active entity only if it is at the current target location
-                        if (textDisplayUuid != null && td.getUniqueId().equals(textDisplayUuid)
-                                && location != null && td.getWorld().equals(location.getWorld())
-                                && td.getLocation().distanceSquared(location) < 1.0) {
+                        // Protect our active entity from deletion
+                        if (textDisplayUuid != null && td.getUniqueId().equals(textDisplayUuid)) {
                             continue;
                         }
                         td.remove();
