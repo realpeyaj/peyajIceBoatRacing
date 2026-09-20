@@ -395,6 +395,7 @@ public class RaceListener implements Listener {
         plugin.editorMode.remove(p.getUniqueId());
         plugin.activeVisualizers.remove(p.getUniqueId());
         plugin.inputMode.remove(p.getUniqueId());
+        plugin.openBoatUtilsPlayers.remove(p.getUniqueId());
     }
 
     @EventHandler

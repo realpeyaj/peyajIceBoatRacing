@@ -10,6 +10,12 @@ settings:
   # Discord webhook URL for race notifications (leave empty to disable)
   discord-webhook-url: ""
 
+  # Collision mode for races:
+  # - DISABLED: Completely disables boat-to-boat collisions at any speed (vanilla players ghost each other; OpenBoatUtils mod clients pass through natively).
+  # - OPENBOATUTILS_ONLY: Only OpenBoatUtils mod clients get no-collision; vanilla clients keep vanilla collisions.
+  # - VANILLA: Standard Minecraft boat collisions.
+  collision-mode: "DISABLED"
+
 # MUSIC SETTINGS
 music:
   enabled: true

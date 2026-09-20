@@ -42,6 +42,10 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Boat;
 import org.bukkit.persistence.PersistentDataType;
 import peyaj.arena.RaceState;
+import com.google.common.io.ByteArrayDataInput;
+import com.google.common.io.ByteStreams;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 
 public class IceBoatRacing extends JavaPlugin {
 
@@ -98,6 +102,24 @@ public class IceBoatRacing extends JavaPlugin {
     public int rewardsMinPlayers = 2;
     public final Map<Integer, List<String>> rewardCommands = new HashMap<>();
 
+    public String collisionMode = "DISABLED";
+    public final Map<UUID, Integer> openBoatUtilsPlayers = new ConcurrentHashMap<>();
+
+    public boolean hasOpenBoatUtils(UUID uuid) {
+        return openBoatUtilsPlayers.containsKey(uuid) && openBoatUtilsPlayers.get(uuid) >= 10;
+    }
+
+    public void sendOpenBoatUtilsNocol(Player player, boolean enableNocol) {
+        if (!hasOpenBoatUtils(player.getUniqueId())) return;
+        try (ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+             DataOutputStream out = new DataOutputStream(byteStream)) {
+            out.writeShort(27); // PACKET_ID_NOCOL
+            out.writeShort(enableNocol ? 1 : 0); // 1 = NOCOL_MODE_NO_COLLISION_BOATS_PLAYERS, 0 = OFF
+            player.sendPluginMessage(this, "openboatutils:settings", byteStream.toByteArray());
+        } catch (Exception ignored) {
+        }
+    }
+
     @Override
     public void onLoad() {
         instance = this;
@@ -130,6 +152,31 @@ public class IceBoatRacing extends JavaPlugin {
         });
 
         hologramManager = new HologramManager(this);
+
+        // OpenBoatUtils integration
+        getServer().getMessenger().registerOutgoingPluginChannel(this, "openboatutils:settings");
+        getServer().getMessenger().registerIncomingPluginChannel(this, "openboatutils:settings", (channel, player, message) -> {
+            if (!"openboatutils:settings".equals(channel) || message == null || message.length < 6) return;
+            try {
+                ByteArrayDataInput in = ByteStreams.newDataInput(message);
+                short packetId = in.readShort();
+                if (packetId == 0) {
+                    int version = in.readInt();
+                    openBoatUtilsPlayers.put(player.getUniqueId(), version);
+
+                    ByteArrayOutputStream b = new ByteArrayOutputStream();
+                    DataOutputStream out = new DataOutputStream(b);
+                    out.writeShort(29);
+                    out.writeBoolean(true);
+                    getServer().getScheduler().runTaskLater(this, () -> {
+                        if (player.isOnline()) {
+                            player.sendPluginMessage(this, "openboatutils:settings", b.toByteArray());
+                        }
+                    }, 10L);
+                }
+            } catch (Exception ignored) {
+            }
+        });
 
         sendStartupBanner();
 
@@ -216,8 +263,12 @@ public class IceBoatRacing extends JavaPlugin {
     @Override
     public void onDisable() {
         instance = null;
+        if (votingTask != null) {
+            votingTask.cancel();
+        }
         for (RaceArena arena : arenas.values()) {
             arena.stopRace();
+            arena.deleteLeaderboardHologram();
         }
         if (hologramManager != null) {
             hologramManager.removeAll();
@@ -228,6 +279,10 @@ public class IceBoatRacing extends JavaPlugin {
         if (statsConfig != null) {
             saveStats();
         }
+        getServer().getMessenger().unregisterOutgoingPluginChannel(this);
+        getServer().getMessenger().unregisterIncomingPluginChannel(this);
+        openBoatUtilsPlayers.clear();
+        playerArenaMap.clear();
         try {
             PacketEvents.getAPI().terminate();
         } catch (Exception ignored) {
@@ -360,6 +415,10 @@ public class IceBoatRacing extends JavaPlugin {
             getConfig().set("victory.rewards.3", Arrays.asList("eco give %player% 100"));
             saveConfig();
             getLogger().info("Updated config.yml with new victory.rewards section.");
+        }
+        if (!getConfig().contains("settings.collision-mode")) {
+            getConfig().set("settings.collision-mode", "DISABLED");
+            saveConfig();
         }
     }
 
@@ -537,6 +596,7 @@ public class IceBoatRacing extends JavaPlugin {
     private void loadConfigSettings() {
         this.checkpointRadius = getConfig().getDouble("settings.checkpoint-radius", 25.0);
         this.discordWebhookUrl = getConfig().getString("settings.discord-webhook-url", "");
+        this.collisionMode = getConfig().getString("settings.collision-mode", "DISABLED").toUpperCase();
 
         this.musicEnabled = getConfig().getBoolean("music.enabled", true);
         this.musicSound = getConfig().getString("music.sound-name", "minecraft:coconutmallmariokartwiiostfourone");

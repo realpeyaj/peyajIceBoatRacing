@@ -414,6 +414,12 @@ public class RaceArena {
         giveSpectatorItems(p);
         setupRaceScoreboard(p);
         plugin.setPlayerArena(p.getUniqueId(), name);
+        for (UUID uuid : players) {
+            Player racer = Bukkit.getPlayer(uuid);
+            Boat boat = playerBoats.get(uuid);
+            if (racer != null && racer.isOnline()) p.showEntity(plugin, racer);
+            if (boat != null && boat.isValid()) p.showEntity(plugin, boat);
+        }
     }
 
     private void giveSpectatorItems(Player p) {
@@ -549,6 +555,7 @@ public class RaceArena {
         else if (p.getWorld() != null)
             p.teleport(p.getWorld().getSpawnLocation());
         plugin.removePlayerFromArenaMap(p.getUniqueId());
+        restoreAllVisibility();
 
         if (players.isEmpty()) {
             if (state != RaceState.LOBBY)
@@ -740,6 +747,7 @@ public class RaceArena {
         state = RaceState.LOBBY;
         isTimeTrialMode = false;
 
+        restoreAllVisibility();
         removeCages();
         for (Boat b : playerBoats.values())
             b.remove();
@@ -1214,23 +1222,6 @@ public class RaceArena {
         playerBoats.put(p.getUniqueId(), boat);
         updateNoCollisionTeam();
         syncGhostModeForPlayer(p, boat);
-        if (boat != null) {
-            for (UUID otherUUID : players) {
-                if (!otherUUID.equals(p.getUniqueId())) {
-                    Player otherP = Bukkit.getPlayer(otherUUID);
-                    if (otherP != null) {
-                        otherP.hideEntity(plugin, boat);
-                        new BukkitRunnable() {
-                            @Override
-                            public void run() {
-                                if (otherP.isOnline() && boat.isValid())
-                                    otherP.showEntity(plugin, boat);
-                            }
-                        }.runTaskLater(plugin, 1L);
-                    }
-                }
-            }
-        }
     }
 
     private List<UUID> calculateRankings() {
@@ -1309,11 +1300,12 @@ public class RaceArena {
     private void createCage(Location spawn, UUID uuid) {
         Material cageMat = plugin.getPlayerCagePreference(uuid);
         Location base = spawn.clone();
-        for (int x = -1; x <= 1; x++) {
-            for (int z = -1; z <= 1; z++) {
-                for (int y = 0; y <= 2; y++) {
-                    // Center space for the boat and rider
-                    if (y < 2 && x == 0 && z == 0) {
+        // 5x5 outer bounds, creating an inner 3x3 air space (-1 to +1 in X and Z)
+        for (int x = -2; x <= 2; x++) {
+            for (int z = -2; z <= 2; z++) {
+                for (int y = 0; y <= 3; y++) {
+                    // 3x3 horizontal air space for y = 0, 1, 2 (giving ample room for boat and driver)
+                    if (y < 3 && x >= -1 && x <= 1 && z >= -1 && z <= 1) {
                         continue;
                     }
                     Location b = base.clone().add(x, y, z);
@@ -1428,29 +1420,96 @@ public class RaceArena {
     }
 
     private void syncGhostModeForPlayer(Player p, Boat b) {
+        if (p == null) return;
+
+        // Ensure collision-free scoreboard team membership
         for (UUID otherUUID : players) {
             Player otherP = Bukkit.getPlayer(otherUUID);
             if (otherP != null) {
-                Team t = otherP.getScoreboard().getTeam("ghost");
-                if (t != null) {
+                Team t = otherP.getScoreboard().getTeam("ibr_racers");
+                if (t == null) {
+                    t = otherP.getScoreboard().getTeam("ghost");
+                }
+                if (t != null && !t.hasEntry(p.getName())) {
                     t.addEntry(p.getName());
-                    t.addEntry(b.getUniqueId().toString());
                 }
             }
         }
+
+        boolean disableCollision = "DISABLED".equalsIgnoreCase(plugin.collisionMode);
+
         for (UUID otherUUID : players) {
-            if (!otherUUID.equals(p.getUniqueId())) {
-                Player otherP = Bukkit.getPlayer(otherUUID);
-                if (otherP != null) {
-                    otherP.hideEntity(plugin, b);
-                    new BukkitRunnable() {
-                        @Override
-                        public void run() {
-                            if (otherP.isOnline() && b.isValid())
-                                otherP.showEntity(plugin, b);
-                        }
-                    }.runTaskLater(plugin, 1L);
+            if (otherUUID.equals(p.getUniqueId())) continue;
+            Player otherP = Bukkit.getPlayer(otherUUID);
+            if (otherP == null || !otherP.isOnline()) continue;
+            Boat otherBoat = playerBoats.get(otherUUID);
+
+            if (disableCollision) {
+                // If both clients have OpenBoatUtils, keep visible; OBU natively disables boat collision
+                if (plugin.hasOpenBoatUtils(p.getUniqueId()) && plugin.hasOpenBoatUtils(otherUUID)) {
+                    otherP.showEntity(plugin, p);
+                    if (b != null && b.isValid()) otherP.showEntity(plugin, b);
+                    p.showEntity(plugin, otherP);
+                    if (otherBoat != null && otherBoat.isValid()) p.showEntity(plugin, otherBoat);
+
+                    plugin.sendOpenBoatUtilsNocol(p, true);
+                    plugin.sendOpenBoatUtilsNocol(otherP, true);
+                } else {
+                    // For vanilla clients, hide each other's boats and players to ensure 100% no-collision at any speed
+                    otherP.hideEntity(plugin, p);
+                    if (b != null && b.isValid()) otherP.hideEntity(plugin, b);
+                    p.hideEntity(plugin, otherP);
+                    if (otherBoat != null && otherBoat.isValid()) p.hideEntity(plugin, otherBoat);
+
+                    // If one has OBU, also send nocol packet to that client
+                    if (plugin.hasOpenBoatUtils(p.getUniqueId())) plugin.sendOpenBoatUtilsNocol(p, true);
+                    if (plugin.hasOpenBoatUtils(otherUUID)) plugin.sendOpenBoatUtilsNocol(otherP, true);
                 }
+            } else if ("OPENBOATUTILS_ONLY".equalsIgnoreCase(plugin.collisionMode)) {
+                if (plugin.hasOpenBoatUtils(p.getUniqueId())) plugin.sendOpenBoatUtilsNocol(p, true);
+                if (plugin.hasOpenBoatUtils(otherUUID)) plugin.sendOpenBoatUtilsNocol(otherP, true);
+                otherP.showEntity(plugin, p);
+                if (b != null && b.isValid()) otherP.showEntity(plugin, b);
+                p.showEntity(plugin, otherP);
+                if (otherBoat != null && otherBoat.isValid()) p.showEntity(plugin, otherBoat);
+            } else {
+                // VANILLA collision
+                otherP.showEntity(plugin, p);
+                if (b != null && b.isValid()) otherP.showEntity(plugin, b);
+                p.showEntity(plugin, otherP);
+                if (otherBoat != null && otherBoat.isValid()) p.showEntity(plugin, otherBoat);
+            }
+        }
+
+        // Spectators always see all players and all boats
+        for (UUID specUUID : spectators) {
+            Player spec = Bukkit.getPlayer(specUUID);
+            if (spec != null && spec.isOnline()) {
+                spec.showEntity(plugin, p);
+                if (b != null && b.isValid()) spec.showEntity(plugin, b);
+            }
+        }
+    }
+
+    public void restoreAllVisibility() {
+        Set<UUID> all = new HashSet<>(players);
+        all.addAll(spectators);
+        for (UUID u1 : all) {
+            Player p1 = Bukkit.getPlayer(u1);
+            if (p1 == null || !p1.isOnline()) continue;
+            for (UUID u2 : all) {
+                if (u1.equals(u2)) continue;
+                Player p2 = Bukkit.getPlayer(u2);
+                if (p2 != null && p2.isOnline()) {
+                    p1.showEntity(plugin, p2);
+                }
+                Boat b2 = playerBoats.get(u2);
+                if (b2 != null && b2.isValid()) {
+                    p1.showEntity(plugin, b2);
+                }
+            }
+            if (plugin.hasOpenBoatUtils(u1)) {
+                plugin.sendOpenBoatUtilsNocol(p1, false);
             }
         }
     }
