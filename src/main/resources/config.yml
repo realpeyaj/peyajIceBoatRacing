@@ -11,10 +11,9 @@ settings:
   discord-webhook-url: ""
 
   # Collision mode for races:
-  # - DISABLED: Completely disables boat-to-boat collisions at any speed (vanilla players ghost each other; OpenBoatUtils mod clients pass through natively).
-  # - OPENBOATUTILS_ONLY: Only OpenBoatUtils mod clients get no-collision; vanilla clients keep vanilla collisions.
-  # - VANILLA: Standard Minecraft boat collisions.
-  collision-mode: "DISABLED"
+  # - DEFAULT: All players and boats are 100% visible. Server-side collision push and rubberbanding are disabled. OpenBoatUtils mod clients pass through boats without client collision.
+  # - GHOST: Opponent racers and boats are hidden (ghost mode for solo time trials or ghost qualifying).
+  collision-mode: "DEFAULT"
 
 # MUSIC SETTINGS
 music:

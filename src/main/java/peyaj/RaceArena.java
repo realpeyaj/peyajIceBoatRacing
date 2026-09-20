@@ -1436,7 +1436,7 @@ public class RaceArena {
             }
         }
 
-        boolean disableCollision = "DISABLED".equalsIgnoreCase(plugin.collisionMode);
+        boolean ghostMode = "GHOST".equalsIgnoreCase(plugin.collisionMode);
 
         for (UUID otherUUID : players) {
             if (otherUUID.equals(p.getUniqueId())) continue;
@@ -1444,40 +1444,22 @@ public class RaceArena {
             if (otherP == null || !otherP.isOnline()) continue;
             Boat otherBoat = playerBoats.get(otherUUID);
 
-            if (disableCollision) {
-                // If both clients have OpenBoatUtils, keep visible; OBU natively disables boat collision
-                if (plugin.hasOpenBoatUtils(p.getUniqueId()) && plugin.hasOpenBoatUtils(otherUUID)) {
-                    otherP.showEntity(plugin, p);
-                    if (b != null && b.isValid()) otherP.showEntity(plugin, b);
-                    p.showEntity(plugin, otherP);
-                    if (otherBoat != null && otherBoat.isValid()) p.showEntity(plugin, otherBoat);
+            if (ghostMode) {
+                // Ghost mode explicitly hides opponent racers and boats (e.g. for solo time-trial qualifying)
+                otherP.hideEntity(plugin, p);
+                if (b != null && b.isValid()) otherP.hideEntity(plugin, b);
+                p.hideEntity(plugin, otherP);
+                if (otherBoat != null && otherBoat.isValid()) p.hideEntity(plugin, otherBoat);
+            } else {
+                // Default: ALL PLAYERS AND BOATS ARE 100% VISIBLE IN THE RACE!
+                otherP.showEntity(plugin, p);
+                if (b != null && b.isValid()) otherP.showEntity(plugin, b);
+                p.showEntity(plugin, otherP);
+                if (otherBoat != null && otherBoat.isValid()) p.showEntity(plugin, otherBoat);
 
-                    plugin.sendOpenBoatUtilsNocol(p, true);
-                    plugin.sendOpenBoatUtilsNocol(otherP, true);
-                } else {
-                    // For vanilla clients, hide each other's boats and players to ensure 100% no-collision at any speed
-                    otherP.hideEntity(plugin, p);
-                    if (b != null && b.isValid()) otherP.hideEntity(plugin, b);
-                    p.hideEntity(plugin, otherP);
-                    if (otherBoat != null && otherBoat.isValid()) p.hideEntity(plugin, otherBoat);
-
-                    // If one has OBU, also send nocol packet to that client
-                    if (plugin.hasOpenBoatUtils(p.getUniqueId())) plugin.sendOpenBoatUtilsNocol(p, true);
-                    if (plugin.hasOpenBoatUtils(otherUUID)) plugin.sendOpenBoatUtilsNocol(otherP, true);
-                }
-            } else if ("OPENBOATUTILS_ONLY".equalsIgnoreCase(plugin.collisionMode)) {
+                // Send OpenBoatUtils packet 27 to modded clients for native client-side no-collision
                 if (plugin.hasOpenBoatUtils(p.getUniqueId())) plugin.sendOpenBoatUtilsNocol(p, true);
                 if (plugin.hasOpenBoatUtils(otherUUID)) plugin.sendOpenBoatUtilsNocol(otherP, true);
-                otherP.showEntity(plugin, p);
-                if (b != null && b.isValid()) otherP.showEntity(plugin, b);
-                p.showEntity(plugin, otherP);
-                if (otherBoat != null && otherBoat.isValid()) p.showEntity(plugin, otherBoat);
-            } else {
-                // VANILLA collision
-                otherP.showEntity(plugin, p);
-                if (b != null && b.isValid()) otherP.showEntity(plugin, b);
-                p.showEntity(plugin, otherP);
-                if (otherBoat != null && otherBoat.isValid()) p.showEntity(plugin, otherBoat);
             }
         }
 

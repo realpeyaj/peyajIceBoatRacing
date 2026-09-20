@@ -102,7 +102,7 @@ public class IceBoatRacing extends JavaPlugin {
     public int rewardsMinPlayers = 2;
     public final Map<Integer, List<String>> rewardCommands = new HashMap<>();
 
-    public String collisionMode = "DISABLED";
+    public String collisionMode = "DEFAULT";
     public final Map<UUID, Integer> openBoatUtilsPlayers = new ConcurrentHashMap<>();
 
     public boolean hasOpenBoatUtils(UUID uuid) {
@@ -177,6 +177,21 @@ public class IceBoatRacing extends JavaPlugin {
             } catch (Exception ignored) {
             }
         });
+
+        // Optimize Spigot movement thresholds for high-speed ice boat racing to prevent rubberbanding/lagbacks
+        try {
+            Class<?> spigotConfigClass = Class.forName("org.spigotmc.SpigotConfig");
+            java.lang.reflect.Field wronglyField = spigotConfigClass.getField("movedWronglyThreshold");
+            java.lang.reflect.Field quicklyField = spigotConfigClass.getField("movedTooQuicklyMultiplier");
+            if (wronglyField.getDouble(null) < 100.0) {
+                wronglyField.setDouble(null, 100.0);
+            }
+            if (quicklyField.getDouble(null) < 100.0) {
+                quicklyField.setDouble(null, 100.0);
+            }
+            getLogger().info("Optimized Spigot moved-wrongly-threshold and moved-too-quickly-multiplier for high-speed ice racing.");
+        } catch (Throwable ignored) {
+        }
 
         sendStartupBanner();
 
@@ -417,7 +432,7 @@ public class IceBoatRacing extends JavaPlugin {
             getLogger().info("Updated config.yml with new victory.rewards section.");
         }
         if (!getConfig().contains("settings.collision-mode")) {
-            getConfig().set("settings.collision-mode", "DISABLED");
+            getConfig().set("settings.collision-mode", "DEFAULT");
             saveConfig();
         }
     }

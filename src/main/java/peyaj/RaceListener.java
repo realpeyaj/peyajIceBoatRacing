@@ -325,8 +325,6 @@ public class RaceListener implements Listener {
 
         if (isRaceCollision) {
             e.setCancelled(true);
-            e.setCollisionCancelled(true);
-            e.setPickupCancelled(true);
         }
     }
 
