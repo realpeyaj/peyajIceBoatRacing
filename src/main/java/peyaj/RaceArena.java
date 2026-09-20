@@ -105,6 +105,51 @@ public class RaceArena {
     // Fake entity IDs for ghosts
     private final Map<UUID, Integer> ghostEntityIds = new HashMap<>();
 
+    // Teleport grace tracking to prevent PacketEvents from blocking intentional teleports
+    private final Map<UUID, Long> teleportGraceUntil = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public void markTeleportGrace(UUID uuid) {
+        teleportGraceUntil.put(uuid, System.currentTimeMillis() + 1000L);
+    }
+
+    public boolean hasTeleportGrace(UUID uuid) {
+        Long until = teleportGraceUntil.get(uuid);
+        return until != null && System.currentTimeMillis() < until;
+    }
+
+    public boolean isBoatInArena(Boat boat) {
+        if (boat == null) return false;
+        return playerBoats.containsValue(boat);
+    }
+
+    public void updateNoCollisionTeam() {
+        for (UUID uuid : players) {
+            Player p = Bukkit.getPlayer(uuid);
+            if (p != null && p.isOnline()) {
+                Scoreboard b = p.getScoreboard();
+                Team racers = b.getTeam("ibr_racers");
+                if (racers == null) {
+                    racers = b.registerNewTeam("ibr_racers");
+                    racers.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
+                }
+                for (UUID otherUuid : players) {
+                    Player other = Bukkit.getPlayer(otherUuid);
+                    if (other != null && other.isOnline()) {
+                        racers.addEntry(other.getName());
+                    }
+                    Boat boat = playerBoats.get(otherUuid);
+                    if (boat != null && boat.isValid()) {
+                        try {
+                            racers.addEntity(boat);
+                        } catch (Throwable t) {
+                            racers.addEntry(boat.getUniqueId().toString());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     public RaceArena(String name, IceBoatRacing plugin) {
         this.name = name;
         this.plugin = plugin;
@@ -462,6 +507,7 @@ public class RaceArena {
         finishTimes.remove(p.getUniqueId());
         finishTimesMs.remove(p.getUniqueId());
 
+        markTeleportGrace(p.getUniqueId());
         startRace(true);
     }
 
@@ -588,8 +634,11 @@ public class RaceArena {
                 continue;
 
             spawnIndex++;
+            markTeleportGrace(uuid);
             p.teleport(spawn);
             Boat boat = Utils.spawnRandomBoat(spawn);
+            boat.getPersistentDataContainer().set(new NamespacedKey(plugin, "race_boat"), PersistentDataType.BYTE, (byte) 1);
+            boat.getPersistentDataContainer().set(new NamespacedKey(plugin, "race_arena"), PersistentDataType.STRING, name);
             boat.addPassenger(p);
             boat.setInvulnerable(true);
             playerBoats.put(uuid, boat);
@@ -600,6 +649,7 @@ public class RaceArena {
             playerLaps.put(uuid, 1);
             setupRaceScoreboard(p);
         }
+        updateNoCollisionTeam();
         syncGhostMode();
 
         raceStartCountdown = 5;
@@ -754,6 +804,10 @@ public class RaceArena {
             return;
         if (state == RaceState.ACTIVE) {
             tickCounter++;
+
+            if (tickCounter % 20 == 0) {
+                updateNoCollisionTeam();
+            }
 
             // Record replay frame
             if (currentReplay != null && tickCounter % 2 == 0) {
@@ -1148,19 +1202,17 @@ public class RaceArena {
             return;
         if (playerBoats.containsKey(p.getUniqueId()))
             playerBoats.get(p.getUniqueId()).remove();
+        markTeleportGrace(p.getUniqueId());
         p.teleport(loc);
         p.playSound(p.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
         lastLocations.put(p.getUniqueId(), loc);
         Boat boat = Utils.spawnRandomBoat(loc);
+        boat.getPersistentDataContainer().set(new NamespacedKey(plugin, "race_boat"), PersistentDataType.BYTE, (byte) 1);
+        boat.getPersistentDataContainer().set(new NamespacedKey(plugin, "race_arena"), PersistentDataType.STRING, name);
         boat.addPassenger(p);
         boat.setInvulnerable(true);
         playerBoats.put(p.getUniqueId(), boat);
-
-        // Critical Fix: Sync last location immediately to avoid speed hack calculation
-        lastLocations.put(p.getUniqueId(), loc);
-        boat.addPassenger(p);
-        boat.setInvulnerable(true);
-        playerBoats.put(p.getUniqueId(), boat);
+        updateNoCollisionTeam();
         syncGhostModeForPlayer(p, boat);
         if (boat != null) {
             for (UUID otherUUID : players) {
@@ -1533,6 +1585,8 @@ public class RaceArena {
         }
         Team ghost = b.registerNewTeam("ghost");
         ghost.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
+        Team racers = b.registerNewTeam("ibr_racers");
+        racers.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
         Utils.createTeam(b, "stats", "§fTime: 00:00");
         o.getScore("§7--------------------").setScore(15);
         o.getScore("§eStats:").setScore(14);

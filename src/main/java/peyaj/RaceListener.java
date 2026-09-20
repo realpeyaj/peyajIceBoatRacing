@@ -20,6 +20,8 @@ import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.vehicle.VehicleBlockCollisionEvent;
+import org.bukkit.event.vehicle.VehicleEntityCollisionEvent;
+import org.bukkit.event.vehicle.VehicleEnterEvent;
 import org.bukkit.event.vehicle.VehicleMoveEvent;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
@@ -300,6 +302,47 @@ public class RaceListener implements Listener {
                 Vector vel = boat.getVelocity();
                 double horizontalSpeed = Math.max(0.45, vel.clone().setY(0).length());
                 boat.setVelocity(direction.clone().multiply(horizontalSpeed).setY(0.2));
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onVehicleEntityCollision(VehicleEntityCollisionEvent e) {
+        Vehicle vehicle = e.getVehicle();
+        org.bukkit.entity.Entity entity = e.getEntity();
+
+        boolean isRaceCollision = false;
+
+        if (vehicle instanceof Boat b && plugin.isRaceBoat(b)) {
+            isRaceCollision = true;
+        } else if (entity instanceof Boat b && plugin.isRaceBoat(b)) {
+            isRaceCollision = true;
+        } else if (vehicle.getPassengers().stream().anyMatch(p -> p instanceof Player pl && plugin.isRacer(pl.getUniqueId()))) {
+            isRaceCollision = true;
+        } else if (entity instanceof Player pl && plugin.isRacer(pl.getUniqueId())) {
+            isRaceCollision = true;
+        }
+
+        if (isRaceCollision) {
+            e.setCancelled(true);
+            e.setCollisionCancelled(true);
+            e.setPickupCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onVehicleEnter(VehicleEnterEvent e) {
+        if (e.getVehicle() instanceof Boat b && plugin.isRaceBoat(b)) {
+            org.bukkit.entity.Entity entered = e.getEntered();
+            // Disallow entering if boat already has a driver, or if the entity is not an active racer
+            if (!b.getPassengers().isEmpty()) {
+                e.setCancelled(true);
+            } else if (entered instanceof Player p) {
+                if (!plugin.isRacer(p.getUniqueId())) {
+                    e.setCancelled(true);
+                }
+            } else {
+                e.setCancelled(true);
             }
         }
     }

@@ -26,7 +26,6 @@ import peyaj.integration.DiscordWebhook;
 import peyaj.integration.IceBoatPlaceholders;
 import peyaj.replay.ReplayManager;
 
-import peyaj.utils.AsyncIO;
 import org.bstats.bukkit.Metrics;
 import org.bstats.charts.SimplePie;
 
@@ -34,8 +33,23 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import peyaj.utils.AsyncIO;
+import com.github.retrooper.packetevents.event.PacketListenerAbstract;
+import com.github.retrooper.packetevents.event.PacketListenerPriority;
+import com.github.retrooper.packetevents.event.PacketSendEvent;
+import com.github.retrooper.packetevents.protocol.packettype.PacketType;
+import org.bukkit.NamespacedKey;
+import org.bukkit.entity.Boat;
+import org.bukkit.persistence.PersistentDataType;
+import peyaj.arena.RaceState;
 
 public class IceBoatRacing extends JavaPlugin {
+
+    private static IceBoatRacing instance;
+
+    public static IceBoatRacing getInstance() {
+        return instance;
+    }
 
     private final Map<String, RaceArena> arenas = new HashMap<>();
     private final Map<UUID, String> playerArenaMap = new ConcurrentHashMap<>();
@@ -86,6 +100,7 @@ public class IceBoatRacing extends JavaPlugin {
 
     @Override
     public void onLoad() {
+        instance = this;
         PacketEvents.setAPI(SpigotPacketEventsBuilder.build(this));
         PacketEvents.getAPI().getSettings().checkForUpdates(false).bStats(false);
         PacketEvents.getAPI().load();
@@ -93,7 +108,27 @@ public class IceBoatRacing extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        instance = this;
         PacketEvents.getAPI().init();
+
+        // PacketEvents Listener to eliminate boat collision rubberbanding/freezing
+        PacketEvents.getAPI().getEventManager().registerListener(new PacketListenerAbstract(PacketListenerPriority.NORMAL) {
+            @Override
+            public void onPacketSend(PacketSendEvent event) {
+                if (event.getPacketType() == PacketType.Play.Server.VEHICLE_MOVE) {
+                    Object pObj = event.getPlayer();
+                    if (pObj instanceof Player p) {
+                        RaceArena arena = getPlayerArena(p.getUniqueId());
+                        if (arena != null && (arena.getState() == RaceState.ACTIVE || arena.getState() == RaceState.STARTING)) {
+                            if (!arena.hasTeleportGrace(p.getUniqueId()) && p.isInsideVehicle() && p.getVehicle() instanceof Boat) {
+                                event.setCancelled(true);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
         hologramManager = new HologramManager(this);
 
         sendStartupBanner();
@@ -180,6 +215,7 @@ public class IceBoatRacing extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        instance = null;
         for (RaceArena arena : arenas.values()) {
             arena.stopRace();
         }
@@ -445,6 +481,19 @@ public class IceBoatRacing extends JavaPlugin {
 
     public boolean isRacer(UUID uuid) {
         return playerArenaMap.containsKey(uuid);
+    }
+
+    public boolean isRaceBoat(Boat boat) {
+        if (boat == null) return false;
+        if (boat.getPersistentDataContainer().has(new NamespacedKey(this, "race_boat"), PersistentDataType.BYTE)) {
+            return true;
+        }
+        for (RaceArena arena : arenas.values()) {
+            if (arena.isBoatInArena(boat)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // SAVE LOGIC (ARENAS.YML)
