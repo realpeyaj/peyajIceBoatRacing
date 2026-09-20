@@ -27,12 +27,14 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.util.Vector;
+import java.util.UUID;
 import peyaj.arena.RaceState;
 import peyaj.cosmetics.EditMode;
 
 public class RaceListener implements Listener {
 
     private final IceBoatRacing plugin;
+    private final java.util.Map<UUID, Double> boatMomentum = new java.util.concurrent.ConcurrentHashMap<>();
 
     public RaceListener(IceBoatRacing plugin) {
         this.plugin = plugin;
@@ -243,6 +245,10 @@ public class RaceListener implements Listener {
         Vector velocity = boat.getVelocity();
         double speed = velocity.clone().setY(0).length();
 
+        if (speed > 0.05) {
+            boatMomentum.put(boat.getUniqueId(), speed);
+        }
+
         double moveDist = from.distanceSquared(to);
         if (speed < 0.02 && moveDist < 0.0001)
             return;
@@ -254,8 +260,8 @@ public class RaceListener implements Listener {
 
         Location boatLoc = boat.getLocation();
 
-        // Check 1 to 2 ticks ahead for step-ups (staircase gliding)
-        double[] offsets = { 0.6, 1.2, 1.2 + speed * 0.8 };
+        // Check ahead for 1-block ice step-ups (staircase gliding)
+        double[] offsets = { 0.3, 0.6, 1.0, 1.0 + speed * 0.8 };
         boolean isClimbing = false;
 
         for (double offset : offsets) {
@@ -275,12 +281,14 @@ public class RaceListener implements Listener {
             if (!aboveWall.getType().isSolid() && !twoAboveWall.getType().isSolid()) {
                 double diffY = (wallBlock.getY() + 1.0) - boatLoc.getY();
 
-                // Smooth staircase climb (up to 1.25 blocks per step)
+                // 1-block ice step up (diffY between 0.05 and 1.25)
                 if (diffY > 0.05 && diffY <= 1.25) {
-                    double climbY = Math.min(0.25, diffY * 0.2 + 0.1);
-                    double forwardSpeed = Math.max(speed, 0.35);
+                    Location stepLoc = boatLoc.clone();
+                    stepLoc.setY(wallBlock.getY() + 1.0);
+                    boat.teleport(stepLoc);
 
-                    boat.setVelocity(direction.clone().multiply(forwardSpeed).setY(climbY));
+                    double forwardSpeed = Math.max(speed, boatMomentum.getOrDefault(boat.getUniqueId(), 0.8));
+                    boat.setVelocity(direction.clone().multiply(forwardSpeed).setY(0.0));
                     isClimbing = true;
                     break;
                 }
@@ -308,12 +316,6 @@ public class RaceListener implements Listener {
         if (!Utils.isIceBlock(block.getType()))
             return;
 
-        Vector toBlock = block.getLocation().add(0.5, 0, 0.5).toVector()
-                .subtract(boat.getLocation().toVector()).setY(0);
-        if (toBlock.lengthSquared() < 0.0001)
-            return;
-        Vector direction = toBlock.normalize();
-
         Block aboveBlock = block.getRelative(org.bukkit.block.BlockFace.UP);
         Block twoAbove = aboveBlock.getRelative(org.bukkit.block.BlockFace.UP);
 
@@ -321,9 +323,13 @@ public class RaceListener implements Listener {
             double diffY = (block.getY() + 1.0) - boat.getLocation().getY();
 
             if (diffY > 0 && diffY <= 1.25) {
-                Vector vel = boat.getVelocity();
-                double horizontalSpeed = Math.max(0.45, vel.clone().setY(0).length());
-                boat.setVelocity(direction.clone().multiply(horizontalSpeed).setY(0.2));
+                Location stepLoc = boat.getLocation().clone();
+                stepLoc.setY(block.getY() + 1.0);
+                boat.teleport(stepLoc);
+
+                double forwardSpeed = Math.max(0.8, boatMomentum.getOrDefault(boat.getUniqueId(), 1.0));
+                Vector dir = boat.getLocation().getDirection().setY(0).normalize();
+                boat.setVelocity(dir.multiply(forwardSpeed).setY(0.0));
             }
         }
     }
@@ -416,6 +422,7 @@ public class RaceListener implements Listener {
         plugin.activeVisualizers.remove(p.getUniqueId());
         plugin.inputMode.remove(p.getUniqueId());
         plugin.openBoatUtilsPlayers.remove(p.getUniqueId());
+        boatMomentum.remove(p.getUniqueId());
     }
 
     @EventHandler

@@ -119,6 +119,13 @@ public class IceBoatRacing extends JavaPlugin {
             player.sendPluginMessage(this, "openboatutils:settings", byteStream.toByteArray());
         } catch (Exception ignored) {
         }
+        try (ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+             DataOutputStream out = new DataOutputStream(byteStream)) {
+            out.writeShort(29); // PACKET_ID_INTERPOLATION_FIX
+            out.writeShort(enableNocol ? 1 : 0);
+            player.sendPluginMessage(this, "openboatutils:settings", byteStream.toByteArray());
+        } catch (Exception ignored) {
+        }
     }
 
     @Override
@@ -165,13 +172,9 @@ public class IceBoatRacing extends JavaPlugin {
                     int version = in.readInt();
                     openBoatUtilsPlayers.put(player.getUniqueId(), version);
 
-                    ByteArrayOutputStream b = new ByteArrayOutputStream();
-                    DataOutputStream out = new DataOutputStream(b);
-                    out.writeShort(29);
-                    out.writeBoolean(true);
                     getServer().getScheduler().runTaskLater(this, () -> {
                         if (player.isOnline()) {
-                            player.sendPluginMessage(this, "openboatutils:settings", b.toByteArray());
+                            sendOpenBoatUtilsNocol(player, true);
                         }
                     }, 10L);
                 }

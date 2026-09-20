@@ -1468,6 +1468,7 @@ public class RaceArena {
         }
 
         boolean ghostMode = "GHOST".equalsIgnoreCase(plugin.collisionMode);
+        boolean phantomMode = "PHANTOM".equalsIgnoreCase(plugin.collisionMode);
 
         for (UUID otherUUID : players) {
             if (otherUUID.equals(p.getUniqueId())) continue;
@@ -1481,6 +1482,15 @@ public class RaceArena {
                 if (b != null && b.isValid()) otherP.hideEntity(plugin, b);
                 p.hideEntity(plugin, otherP);
                 if (otherBoat != null && otherBoat.isValid()) p.hideEntity(plugin, otherBoat);
+            } else if (phantomMode) {
+                // Phantom mode: Opponent players are 100% visible, but opponent boat hitboxes are hidden from clients so vanilla clients pass straight through each other with 0 collision!
+                otherP.showEntity(plugin, p);
+                if (b != null && b.isValid()) otherP.hideEntity(plugin, b);
+                p.showEntity(plugin, otherP);
+                if (otherBoat != null && otherBoat.isValid()) p.hideEntity(plugin, otherBoat);
+
+                if (plugin.hasOpenBoatUtils(p.getUniqueId())) plugin.sendOpenBoatUtilsNocol(p, true);
+                if (plugin.hasOpenBoatUtils(otherUUID)) plugin.sendOpenBoatUtilsNocol(otherP, true);
             } else {
                 // Default: ALL PLAYERS AND BOATS ARE 100% VISIBLE IN THE RACE!
                 otherP.showEntity(plugin, p);
@@ -1488,7 +1498,7 @@ public class RaceArena {
                 p.showEntity(plugin, otherP);
                 if (otherBoat != null && otherBoat.isValid()) p.showEntity(plugin, otherBoat);
 
-                // Send OpenBoatUtils packet 27 to modded clients for native client-side no-collision
+                // Send OpenBoatUtils packet 27 and 29 to modded clients for native client-side no-collision
                 if (plugin.hasOpenBoatUtils(p.getUniqueId())) plugin.sendOpenBoatUtilsNocol(p, true);
                 if (plugin.hasOpenBoatUtils(otherUUID)) plugin.sendOpenBoatUtilsNocol(otherP, true);
             }
