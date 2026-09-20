@@ -103,6 +103,7 @@ public class IceBoatRacing extends JavaPlugin {
     public final Map<Integer, List<String>> rewardCommands = new HashMap<>();
 
     public String collisionMode = "DEFAULT";
+    public int cageSize = 3;
     public final Map<UUID, Integer> openBoatUtilsPlayers = new ConcurrentHashMap<>();
 
     public boolean hasOpenBoatUtils(UUID uuid) {
@@ -435,6 +436,10 @@ public class IceBoatRacing extends JavaPlugin {
             getConfig().set("settings.collision-mode", "DEFAULT");
             saveConfig();
         }
+        if (!getConfig().contains("settings.cage-size")) {
+            getConfig().set("settings.cage-size", 3);
+            saveConfig();
+        }
     }
 
     // CONFIG HELPERS
@@ -574,6 +579,7 @@ public class IceBoatRacing extends JavaPlugin {
     public void saveArenas() {
         getConfig().set("settings.checkpoint-radius", checkpointRadius);
         getConfig().set("settings.discord-webhook-url", discordWebhookUrl);
+        getConfig().set("settings.cage-size", cageSize);
 
         getConfig().set("music.enabled", musicEnabled);
         getConfig().set("music.sound-name", musicSound);
@@ -611,7 +617,8 @@ public class IceBoatRacing extends JavaPlugin {
     private void loadConfigSettings() {
         this.checkpointRadius = getConfig().getDouble("settings.checkpoint-radius", 25.0);
         this.discordWebhookUrl = getConfig().getString("settings.discord-webhook-url", "");
-        this.collisionMode = getConfig().getString("settings.collision-mode", "DISABLED").toUpperCase();
+        this.collisionMode = getConfig().getString("settings.collision-mode", "DEFAULT").toUpperCase();
+        this.cageSize = getConfig().getInt("settings.cage-size", 3);
 
         this.musicEnabled = getConfig().getBoolean("music.enabled", true);
         this.musicSound = getConfig().getString("music.sound-name", "minecraft:coconutmallmariokartwiiostfourone");

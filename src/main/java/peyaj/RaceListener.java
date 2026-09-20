@@ -200,11 +200,33 @@ public class RaceListener implements Listener {
 
         RaceArena arena = plugin.getPlayerArena(p.getUniqueId());
         if (arena != null && arena.getState() == RaceState.STARTING) {
-            boat.setVelocity(new Vector(0, 0, 0));
-            Location from = e.getFrom();
             Location to = e.getTo();
-            if (from.getX() != to.getX() || from.getZ() != to.getZ() || from.getY() != to.getY()) {
-                boat.teleport(from);
+            Location spawn = arena.getPlayerSpawn(p.getUniqueId());
+            if (spawn != null && spawn.getWorld() != null && spawn.getWorld().equals(to.getWorld())) {
+                double centerX = (plugin.cageSize == 2) ? (spawn.getBlockX() + 1.0) : (spawn.getBlockX() + 0.5);
+                double centerZ = (plugin.cageSize == 2) ? (spawn.getBlockZ() + 1.0) : (spawn.getBlockZ() + 0.5);
+                double maxOffset = (plugin.cageSize == 2) ? 0.95 : 1.45;
+                double clampLimit = (plugin.cageSize == 2) ? 0.90 : 1.40;
+
+                double dx = Math.abs(to.getX() - centerX);
+                double dz = Math.abs(to.getZ() - centerZ);
+
+                // Allow completely free rotation and movement inside the cage air space!
+                // Only clamp if player attempts to glitch out through the cage walls:
+                if (dx > maxOffset || dz > maxOffset) {
+                    Location clamped = to.clone();
+                    if (dx > maxOffset) {
+                        clamped.setX(centerX + Math.signum(to.getX() - centerX) * clampLimit);
+                    }
+                    if (dz > maxOffset) {
+                        clamped.setZ(centerZ + Math.signum(to.getZ() - centerZ) * clampLimit);
+                    }
+                    // CRITICAL: Preserve yaw & pitch so camera and boat rotation are never snapped back!
+                    clamped.setYaw(to.getYaw());
+                    clamped.setPitch(to.getPitch());
+                    boat.setVelocity(new Vector(0, 0, 0));
+                    boat.teleport(clamped);
+                }
             }
             return;
         }

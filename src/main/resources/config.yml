@@ -15,6 +15,11 @@ settings:
   # - GHOST: Opponent racers and boats are hidden (ghost mode for solo time trials or ghost qualifying).
   collision-mode: "DEFAULT"
 
+  # Starting cage interior size:
+  # - 3: 3x3 interior air space (recommended for smooth 360-degree rotation and steering)
+  # - 2: 2x2 interior air space (snug fit, tight turning against walls)
+  cage-size: 3
+
 # MUSIC SETTINGS
 music:
   enabled: true

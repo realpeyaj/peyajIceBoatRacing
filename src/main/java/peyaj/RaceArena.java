@@ -65,6 +65,7 @@ public class RaceArena {
     private final List<UUID> finishOrder = new ArrayList<>();
     private final Map<UUID, Location> lastLocations = new HashMap<>();
     private final List<Location> glassBlocks = new ArrayList<>();
+    private final Map<UUID, Location> playerSpawnLocations = new HashMap<>();
 
     // Spectator modes
     private final Map<UUID, SpectatorMode> spectatorModes = new HashMap<>();
@@ -255,6 +256,10 @@ public class RaceArena {
 
     public boolean isSpectator(UUID uuid) {
         return spectators.contains(uuid);
+    }
+
+    public Location getPlayerSpawn(UUID uuid) {
+        return playerSpawnLocations.get(uuid);
     }
 
     public void addSpawn(Location loc) {
@@ -641,9 +646,15 @@ public class RaceArena {
                 continue;
 
             spawnIndex++;
+            Location boatSpawn = spawn.clone();
+            if (plugin.cageSize == 2) {
+                boatSpawn.setX(spawn.getBlockX() + 1.0);
+                boatSpawn.setZ(spawn.getBlockZ() + 1.0);
+            }
+            playerSpawnLocations.put(uuid, spawn.clone());
             markTeleportGrace(uuid);
-            p.teleport(spawn);
-            Boat boat = Utils.spawnRandomBoat(spawn);
+            p.teleport(boatSpawn);
+            Boat boat = Utils.spawnRandomBoat(boatSpawn);
             boat.getPersistentDataContainer().set(new NamespacedKey(plugin, "race_boat"), PersistentDataType.BYTE, (byte) 1);
             boat.getPersistentDataContainer().set(new NamespacedKey(plugin, "race_arena"), PersistentDataType.STRING, name);
             boat.addPassenger(p);
@@ -695,7 +706,6 @@ public class RaceArena {
                                     0.5f + ((5 - raceStartCountdown) * 0.3f));
                             Boat boat = playerBoats.get(uuid);
                             if (boat != null) {
-                                boat.setVelocity(new Vector(0, 0, 0));
                                 // Spawn traffic light particles above boat
                                 Location lightLoc = boat.getLocation().add(0, 3, 0);
                                 p.getWorld().spawnParticle(Particle.DUST, lightLoc, 15, 0.3, 0.3, 0.3, 0,
@@ -758,6 +768,7 @@ public class RaceArena {
         currentRecordings.clear();
         checkpointTimestamps.clear();
         eliminatedPlayers.clear();
+        playerSpawnLocations.clear();
 
         // Clean up fake entities
         for (UUID uuid : players) {
@@ -1300,19 +1311,39 @@ public class RaceArena {
     private void createCage(Location spawn, UUID uuid) {
         Material cageMat = plugin.getPlayerCagePreference(uuid);
         Location base = spawn.clone();
-        // 5x5 outer bounds, creating an inner 3x3 air space (-1 to +1 in X and Z)
-        for (int x = -2; x <= 2; x++) {
-            for (int z = -2; z <= 2; z++) {
-                for (int y = 0; y <= 3; y++) {
-                    // 3x3 horizontal air space for y = 0, 1, 2 (giving ample room for boat and driver)
-                    if (y < 3 && x >= -1 && x <= 1 && z >= -1 && z <= 1) {
-                        continue;
+        int size = plugin.cageSize;
+        if (size == 2) {
+            // 4x4 outer bounds, creating an inner 2x2 air space (0 to 1 in X and Z)
+            for (int x = -1; x <= 2; x++) {
+                for (int z = -1; z <= 2; z++) {
+                    for (int y = 0; y <= 3; y++) {
+                        if (y < 3 && (x == 0 || x == 1) && (z == 0 || z == 1)) {
+                            continue;
+                        }
+                        Location b = base.clone().add(x, y, z);
+                        Block block = b.getBlock();
+                        if (block.isEmpty() || block.isPassable()) {
+                            block.setType(cageMat);
+                            glassBlocks.add(b);
+                        }
                     }
-                    Location b = base.clone().add(x, y, z);
-                    Block block = b.getBlock();
-                    if (block.isEmpty() || block.isPassable()) {
-                        block.setType(cageMat);
-                        glassBlocks.add(b);
+                }
+            }
+        } else {
+            // Default 5x5 outer bounds, creating an inner 3x3 air space (-1 to +1 in X and Z)
+            for (int x = -2; x <= 2; x++) {
+                for (int z = -2; z <= 2; z++) {
+                    for (int y = 0; y <= 3; y++) {
+                        // 3x3 horizontal air space for y = 0, 1, 2 (giving ample room for boat and driver)
+                        if (y < 3 && x >= -1 && x <= 1 && z >= -1 && z <= 1) {
+                            continue;
+                        }
+                        Location b = base.clone().add(x, y, z);
+                        Block block = b.getBlock();
+                        if (block.isEmpty() || block.isPassable()) {
+                            block.setType(cageMat);
+                            glassBlocks.add(b);
+                        }
                     }
                 }
             }
