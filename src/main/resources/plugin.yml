@@ -1,5 +1,5 @@
 name: IceBoatRacing
-version: 3.2.2
+version: 3.2.3
 main: peyaj.IceBoatRacing
 api-version: "1.21"
 authors: [peyaj]
