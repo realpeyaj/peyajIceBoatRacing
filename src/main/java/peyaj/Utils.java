@@ -115,21 +115,23 @@ public class Utils {
         return t;
     }
 
-    // BOAT SPAWNING (Paper 1.21+ / 26.2 compatible)
-    private static final org.bukkit.entity.EntityType[] BOAT_TYPES = {
-            org.bukkit.entity.EntityType.OAK_BOAT,
-            org.bukkit.entity.EntityType.SPRUCE_BOAT,
-            org.bukkit.entity.EntityType.BIRCH_BOAT,
-            org.bukkit.entity.EntityType.JUNGLE_BOAT,
-            org.bukkit.entity.EntityType.ACACIA_BOAT,
-            org.bukkit.entity.EntityType.DARK_OAK_BOAT,
-            org.bukkit.entity.EntityType.MANGROVE_BOAT,
-            org.bukkit.entity.EntityType.CHERRY_BOAT,
-            org.bukkit.entity.EntityType.BAMBOO_RAFT
-    };
+    // BOAT SPAWNING (Paper 1.21+ / 26.2 / 26.3 compatible)
+    private static final java.util.List<org.bukkit.entity.EntityType> BOAT_TYPES = new java.util.ArrayList<>();
+
+    static {
+        for (org.bukkit.entity.EntityType type : org.bukkit.entity.EntityType.values()) {
+            String name = type.name();
+            if ((name.endsWith("_BOAT") || name.endsWith("_RAFT")) && !name.contains("CHEST")) {
+                BOAT_TYPES.add(type);
+            }
+        }
+        if (BOAT_TYPES.isEmpty()) {
+            BOAT_TYPES.add(org.bukkit.entity.EntityType.OAK_BOAT);
+        }
+    }
 
     public static Boat spawnRandomBoat(Location loc) {
-        org.bukkit.entity.EntityType selectedType = BOAT_TYPES[ThreadLocalRandom.current().nextInt(BOAT_TYPES.length)];
+        org.bukkit.entity.EntityType selectedType = BOAT_TYPES.get(ThreadLocalRandom.current().nextInt(BOAT_TYPES.size()));
         Boat boat = (Boat) loc.getWorld().spawnEntity(loc, selectedType);
         try {
             boat.getClass().getMethod("setStepHeight", float.class).invoke(boat, 1.25f);

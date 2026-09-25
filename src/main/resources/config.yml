@@ -11,8 +11,7 @@ settings:
   discord-webhook-url: ""
 
   # Collision mode for races:
-  # - DEFAULT: All players and boats are 100% visible. OpenBoatUtils mod clients pass through boats without client collision.
-  # - PHANTOM: Opponent players are 100% visible, but opponent boat collision boxes are hidden from clients so VANILLA clients pass straight through each other with 0 collision!
+  # - DEFAULT: All racers and boats are 100% visible. Includes built-in collision assist for vanilla clients (no rubberbanding/freezing, smooth passing, and no wall-pushing) without needing mods, plus full OpenBoatUtils support.
   # - GHOST: Opponent racers and boats are hidden (ghost mode for solo time trials or ghost qualifying).
   collision-mode: "DEFAULT"
 

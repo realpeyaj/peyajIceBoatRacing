@@ -261,7 +261,7 @@ public class RaceListener implements Listener {
         Location boatLoc = boat.getLocation();
 
         // Check ahead for 1-block ice step-ups (staircase gliding)
-        double[] offsets = { 0.3, 0.6, 1.0, 1.0 + speed * 0.8 };
+        double[] offsets = { 0.25, 0.55, 0.9 };
         boolean isClimbing = false;
 
         for (double offset : offsets) {
@@ -281,16 +281,38 @@ public class RaceListener implements Listener {
             if (!aboveWall.getType().isSolid() && !twoAboveWall.getType().isSolid()) {
                 double diffY = (wallBlock.getY() + 1.0) - boatLoc.getY();
 
-                // 1-block ice step up (diffY between 0.05 and 1.25)
-                if (diffY > 0.05 && diffY <= 1.25) {
-                    Location stepLoc = boatLoc.clone();
+                // 1-block ice step up (diffY between 0.05 and 1.5)
+                if (diffY > 0.05 && diffY <= 1.5) {
+                    if (arena != null) {
+                        arena.markTeleportGrace(p.getUniqueId());
+                    }
+
+                    Location stepLoc = boatLoc.clone().add(direction.clone().multiply(0.65));
                     stepLoc.setY(wallBlock.getY() + 1.0);
+                    stepLoc.setYaw(boatLoc.getYaw());
+                    stepLoc.setPitch(boatLoc.getPitch());
                     boat.teleport(stepLoc);
 
-                    double forwardSpeed = Math.max(speed, boatMomentum.getOrDefault(boat.getUniqueId(), 0.8));
+                    double forwardSpeed = Math.max(speed, boatMomentum.getOrDefault(boat.getUniqueId(), 0.9));
                     boat.setVelocity(direction.clone().multiply(forwardSpeed).setY(0.0));
                     isClimbing = true;
                     break;
+                }
+            }
+        }
+
+        // Zero-Collision Assist for Racing Boats (No Teleports, No Leapfrog)
+        if (arena != null && arena.getState() == RaceState.ACTIVE) {
+            for (UUID otherUuid : arena.getPlayers()) {
+                if (otherUuid.equals(p.getUniqueId())) continue;
+                Boat otherBoat = arena.getPlayerBoat(otherUuid);
+                if (otherBoat == null || !otherBoat.isValid() || otherBoat.getWorld() == null || !otherBoat.getWorld().equals(boatLoc.getWorld())) continue;
+
+                double distSq = boatLoc.distanceSquared(otherBoat.getLocation());
+                if (distSq < 3.24) { // Within 1.8 blocks of another boat
+                    // Lock velocity forward along driving direction so boats never bounce, slow down, or get shoved into walls
+                    double forwardSpeed = Math.max(speed, boatMomentum.getOrDefault(boat.getUniqueId(), 0.8));
+                    boat.setVelocity(direction.clone().multiply(forwardSpeed).setY(boat.getVelocity().getY()));
                 }
             }
         }
@@ -299,7 +321,8 @@ public class RaceListener implements Listener {
         if (!isClimbing && velocity.getY() > 0.05) {
             Block below = boatLoc.clone().subtract(0, 0.1, 0).getBlock();
             if (below.getType().isSolid() && Utils.isIceBlock(below.getType())) {
-                boat.setVelocity(direction.clone().multiply(Math.max(speed, 0.3)).setY(0));
+                double forwardSpeed = Math.max(speed, boatMomentum.getOrDefault(boat.getUniqueId(), 0.8));
+                boat.setVelocity(direction.clone().multiply(forwardSpeed).setY(0.0));
             }
         }
     }
@@ -308,7 +331,7 @@ public class RaceListener implements Listener {
     public void onBoatCollision(VehicleBlockCollisionEvent e) {
         if (!(e.getVehicle() instanceof Boat boat))
             return;
-        if (boat.getPassengers().isEmpty() || !(boat.getPassengers().get(0) instanceof Player))
+        if (boat.getPassengers().isEmpty() || !(boat.getPassengers().get(0) instanceof Player p))
             return;
 
         Block block = e.getBlock();
@@ -322,13 +345,29 @@ public class RaceListener implements Listener {
         if (!aboveBlock.getType().isSolid() && !twoAbove.getType().isSolid()) {
             double diffY = (block.getY() + 1.0) - boat.getLocation().getY();
 
-            if (diffY > 0 && diffY <= 1.25) {
-                Location stepLoc = boat.getLocation().clone();
+            if (diffY > 0.05 && diffY <= 1.5) {
+                Vector dir = boat.getLocation().getDirection().setY(0);
+                if (dir.lengthSquared() < 0.0001) {
+                    dir = block.getLocation().add(0.5, 0, 0.5).toVector().subtract(boat.getLocation().toVector()).setY(0);
+                }
+                if (dir.lengthSquared() > 0.0001) {
+                    dir.normalize();
+                } else {
+                    dir = new Vector(0, 0, 1);
+                }
+
+                RaceArena arena = plugin.getPlayerArena(p.getUniqueId());
+                if (arena != null) {
+                    arena.markTeleportGrace(p.getUniqueId());
+                }
+
+                Location stepLoc = boat.getLocation().clone().add(dir.clone().multiply(0.65));
                 stepLoc.setY(block.getY() + 1.0);
+                stepLoc.setYaw(boat.getLocation().getYaw());
+                stepLoc.setPitch(boat.getLocation().getPitch());
                 boat.teleport(stepLoc);
 
-                double forwardSpeed = Math.max(0.8, boatMomentum.getOrDefault(boat.getUniqueId(), 1.0));
-                Vector dir = boat.getLocation().getDirection().setY(0).normalize();
+                double forwardSpeed = Math.max(0.9, boatMomentum.getOrDefault(boat.getUniqueId(), 1.0));
                 boat.setVelocity(dir.multiply(forwardSpeed).setY(0.0));
             }
         }
@@ -353,6 +392,11 @@ public class RaceListener implements Listener {
 
         if (isRaceCollision) {
             e.setCancelled(true);
+            try {
+                e.setCollisionCancelled(true);
+                e.setPickupCancelled(true);
+            } catch (Throwable ignored) {
+            }
         }
     }
 
