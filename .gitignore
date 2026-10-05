@@ -2,5 +2,6 @@ target/
 .idea/
 *.iml
 .antigravity/
+.agent/
 Test.java
 effective-pom

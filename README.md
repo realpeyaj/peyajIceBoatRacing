@@ -1,5 +1,8 @@
-# IceBoatRacing v3.2
-*A feature-rich, competitive Ice Boat Racing plugin for Paper **1.21.x - 26.2**.*
+# IceBoatRacing v3.2.3
+
+*A feature-rich, high-performance competitive Ice Boat Racing plugin for Paper **1.21.x - 26.3+**.*
+
+![Preview](https://i.imgur.com/z8kkRxi.gif)
 
 Are you a filipino and want to host your Minecraft server in the Philippines? Visit https://mcziehost.fun
 
@@ -7,115 +10,87 @@ Are you a filipino and want to host your Minecraft server in the Philippines? Vi
 
 ---
 
-## Features Overview
-![Preview](https://i.imgur.com/z8kkRxi.gif)
-### Core Racing
-- **Multi-Arena Support** - Run multiple races simultaneously
-- **Race Modes** - DEFAULT (Sprint), LAP (Looping), ELIMINATION (Last place eliminated each lap)
-- **Ray-Traced Physics** - Detects checkpoints at **100km/h+** without skipping
-- **Visual Editor** - Wand tool with real-time particle visualization
-
-### v3.2 New Features
+## Key Features
 
 | Feature | Description |
-|---------|-------------|
-| **Race Replays** | Hypixel-style replay playback of completed races |
-| **Enhanced Ghosts** | Race against server best times with fake packet boats |
-| **Traffic Light Start** | Colored particle countdown (Red -> Yellow -> Green) |
-| **Victory Celebrations** | Fireworks and broadcasts for race winners |
-| **Elimination Mode** | Last place eliminated each lap |
-| **Spectator Modes** | Free-fly, Follow Leader, Follow Player cameras |
-| **17 Particle Trails** | Rainbow, Electric, Sculk, Cherry, Lava, and more |
-| **Titles System** | Unlockable ranks based on wins |
-| **PlaceholderAPI** | Stats placeholders for scoreboards |
-| **Discord Integration** | Rich embeds for race results and records |
+|---|---|
+| **Multi-Arena Engine** | Run multiple simultaneous races across independent tracks. |
+| **Race Modes** | `DEFAULT` (Sprint / Point-to-Point), `LAP` (Circuit), and `ELIMINATION` (last racer eliminated each lap). |
+| **Ice Staircase Gliding** | Instant 1-block ice step-up climbing that preserves full forward momentum without stopping. |
+| **Zero-Collision Assist** | Built-in anti-rubberbanding and lateral stabilization for vanilla clients, plus native **OpenBoatUtils** protocol support. |
+| **100% Opponent Visibility** | All racers and boats stay visible to vanilla and modded players throughout the race. |
+| **Standalone Holograms** | Built-in modern `TextDisplay` leaderboard holograms with clean transparent backgrounds—no external hologram plugins needed! |
+| **Hypixel-Style Replays** | In-engine race recording and spectator replay playback. |
+| **Ghost Time Trials** | Race against server records with lightweight packet-based ghost boats. |
+| **Configurable Starting Grid** | Customizable countdown cages (2x2 or 3x3) with full 360° steering freedom and traffic light particles. |
+| **17 Cosmetic Trails** | Rainbow, Electric, Sculk, Cherry Blossom, Lava, Soul Fire, and more. |
+| **Party & Spectator System** | Party racing (`/race party`) and dynamic camera modes (Free-fly, Follow Leader, Follow Player). |
+| **Discord & PAPI** | Live race results via Discord webhooks and comprehensive PlaceholderAPI expansions. |
 
 ---
 
 ## Installation
 
 1. **Requirements:**
-   - Paper 1.21.x - 26.2 server
-   - Standalone (Built-in PacketEvents & TextDisplay Hologram Engine - No ProtocolLib or DecentHolograms required!)
+   - Server: Paper / Purpur **1.21.x - 26.3+** (Java 21+)
+   - Standalone: Built-in PacketEvents & TextDisplay engine (no ProtocolLib or DecentHolograms required!)
    - *(Optional)* [PlaceholderAPI](https://www.spigotmc.org/resources/placeholderapi.6245/)
-
-2. Download `IceBoatRacing-3.2.jar` and place in `/plugins`
-3. **Restart** the server (do not use `/reload`)
-4. Configure `config.yml` as needed
+2. Download `IceBoatRacing-3.2.3.jar` and place it in your server's `/plugins` folder.
+3. **Restart** your server.
+4. Configure options in `plugins/IceBoatRacing/config.yml`.
 
 ---
 
-## Commands
+## Commands & Permissions
 
 | Command | Description | Permission |
-|---------|-------------|------------|
-| `/iceboat` | Open main GUI menu | - |
-| `/race join <arena>` | Join an arena | - |
-| `/race leave` | Leave current race | - |
-| `/racequit` | Quick alias for leaving | - |
-| `/checkpoint` | Respawn at last checkpoint | - |
-| `/race vote` | Vote for map (during voting) | - |
-| `/race party create` | Create a party | - |
-| `/race party invite <player>` | Invite to party | - |
-| `/race party accept` | Accept party invite | - |
-| `/race party leave` | Leave party | - |
-| `/race replay list <arena>` | List arena replays | - |
-| `/race replay watch <arena> <#>` | Watch a replay | - |
-| `/race admin wand` | Get setup wand | `race.admin` |
-| `/race admin startvote` | Start map voting | `race.admin` |
-| `/race admin reload` | Reload config | `race.admin` |
-| `/race start <arena>` | Force start race | `race.admin` |
-| `/race stop <arena>` | Stop race | `race.admin` |
+|---|---|---|
+| `/iceboat` | Open the main racing GUI | `race.use` (default: true) |
+| `/race join <arena>` | Join an arena queue | `race.use` |
+| `/race leave` | Leave the current race | `race.use` |
+| `/racequit` | Quick shortcut to exit race | `race.use` |
+| `/checkpoint` | Respawn at your last checkpoint | `race.use` |
+| `/race vote` | Vote for an arena map | `race.use` |
+| `/race party <create\|invite\|accept\|leave>` | Manage racing parties | `race.party` (default: true) |
+| `/race replay <list\|watch>` | View and watch race replays | `race.replay` (default: true) |
+| `/race spectate <arena>` | Spectate an active race | `race.spectate` (default: true) |
+| `/race admin wand` | Receive arena setup wand | `race.admin` (default: op) |
+| `/race admin create <name>` | Create a new arena | `race.admin` |
+| `/race admin edit <name>` | Open in-game arena editor GUI | `race.admin` |
+| `/race admin reload` | Reload configuration files | `race.admin` |
+| `/race start <arena>` | Force start an arena race | `race.admin` |
+| `/race stop <arena>` | Force stop an active race | `race.admin` |
 
 ---
 
 ## PlaceholderAPI Placeholders
 
 | Placeholder | Description |
-|-------------|-------------|
-| `%iceboat_wins%` | Total wins |
-| `%iceboat_races%` | Races played |
+|---|---|
+| `%iceboat_wins%` | Total player wins |
+| `%iceboat_races%` | Total races completed |
 | `%iceboat_winrate%` | Win percentage |
-| `%iceboat_best_time_<arena>%` | Best time on arena |
+| `%iceboat_best_time_<arena>%` | Player personal best time on specified arena |
+| `%iceboat_arena_record_<arena>%` | Overall record time on specified arena |
 | `%iceboat_current_arena%` | Current arena name |
-| `%iceboat_title%` | Current title |
-| `%iceboat_in_race%` | true/false |
-| `%iceboat_arena_record_<arena>%` | Arena record time |
-| `%iceboat_total_arenas%` | Total arena count |
+| `%iceboat_title%` | Current racing rank/title |
+| `%iceboat_in_race%` | `true` if currently in an active race |
+| `%iceboat_total_arenas%` | Total configured arenas |
 
 ---
 
-## Particle Trails
+## Configuration (`config.yml`)
 
-Unlockable trails with permissions:
-- `race.trail.smoke` -> Smoke
-- `race.trail.flame` -> Flame  
-- `race.trail.soul` -> Soul Fire
-- `race.trail.rainbow` -> Rainbow (HSB color cycling)
-- `race.trail.electric` -> Electric Spark
-- `race.trail.sculk` -> Sculk (Deep Dark themed)
-- `race.trail.honey` -> Dripping Honey
-- `race.trail.lava` -> Lava Drip
-- `race.trail.cherry` -> Cherry Blossom
-- `race.trail.snow` -> Snowflake
-- `race.trail.water` -> Water Splash
-- And more!
+Key options available in `config.yml`:
+- `settings.collision-mode`: `DEFAULT` (vanilla collision assist + OpenBoatUtils), or `GHOST` (solo ghost mode).
+- `settings.cage-size`: `3` (3x3 air space for free steering) or `2` (snug 2x2 fit).
+- `settings.checkpoint-radius`: Radius for checkpoint detection (blocks).
+- `music`: Custom soundtrack support with loop duration and volume.
+- `replay`: Recording tick intervals and saved replays per track.
+- `discord`: Webhook notifications for race starts, results, and track records.
 
 ---
-
-## Configuration
-
-All features are configurable in `config.yml`:
-- Checkpoint detection radius
-- Discord webhook URL
-- Music settings
-- Replay limits (max per arena)
-- Party settings (size, cooldowns)
-- Victory celebrations
-- Trail particle rates
-- Title unlock thresholds
-
 
 ## License
 
-GNU GPL v3
+GNU General Public License v3.0 (GPL-3.0)
