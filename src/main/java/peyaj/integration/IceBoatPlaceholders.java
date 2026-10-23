@@ -1,11 +1,16 @@
 package peyaj.integration;
 
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
+import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import peyaj.IceBoatRacing;
+import peyaj.Utils;
+
+import java.util.Locale;
+import java.util.Map;
 
 /**
  * PlaceholderAPI expansion for IceBoatRacing.
@@ -80,9 +85,37 @@ public class IceBoatPlaceholders extends PlaceholderExpansion {
             return getPlayerTitle(offlinePlayer);
         }
 
-        // %iceboat_best_time_<arena>%
-        if (params.toLowerCase().startsWith("best_time_")) {
-            String arenaName = params.substring(10);
+        String lower = params.toLowerCase();
+
+        // %iceboat_best_time_...%
+        if (lower.startsWith("best_time_")) {
+            String sub = lower.substring(10);
+            String arenaName;
+            int type = 0; // 0: formatted, 1: clock (00:00.00), 2: raw millis, 3: decimal seconds
+
+            if (sub.startsWith("raw_")) {
+                arenaName = params.substring(14);
+                type = 2;
+            } else if (sub.startsWith("ms_")) {
+                arenaName = params.substring(13);
+                type = 2;
+            } else if (sub.startsWith("seconds_")) {
+                arenaName = params.substring(18);
+                type = 3;
+            } else if (sub.startsWith("sec_")) {
+                arenaName = params.substring(14);
+                type = 3;
+            } else if (sub.startsWith("clock_")) {
+                arenaName = params.substring(16);
+                type = 1;
+            } else if (sub.startsWith("formatted_")) {
+                arenaName = params.substring(20);
+                type = 0;
+            } else {
+                arenaName = params.substring(10);
+                type = 0;
+            }
+
             var arena = plugin.getArena(arenaName);
             if (arena == null)
                 return "N/A";
@@ -91,18 +124,70 @@ public class IceBoatPlaceholders extends PlaceholderExpansion {
             if (bestTime == null)
                 return "N/A";
 
-            return formatTime(bestTime);
+            return switch (type) {
+                case 1 -> Utils.formatClockTime(bestTime);
+                case 2 -> String.valueOf(bestTime);
+                case 3 -> String.format(Locale.US, "%.2f", bestTime / 1000.0);
+                default -> Utils.formatTime(bestTime);
+            };
         }
 
-        // %iceboat_arena_record_<arena>%
-        if (params.toLowerCase().startsWith("arena_record_")) {
-            String arenaName = params.substring(13);
+        // %iceboat_arena_record_holder_<arena>%
+        if (lower.startsWith("arena_record_holder_")) {
+            String arenaName = params.substring(20);
+            var arena = plugin.getArena(arenaName);
+            if (arena == null || arena.bestTimes.isEmpty())
+                return "None";
+
+            var optEntry = arena.bestTimes.entrySet().stream()
+                    .min(Map.Entry.comparingByValue());
+            if (optEntry.isEmpty())
+                return "None";
+
+            OfflinePlayer holder = Bukkit.getOfflinePlayer(optEntry.get().getKey());
+            return holder.getName() != null ? holder.getName() : "Unknown";
+        }
+
+        // %iceboat_arena_record_...%
+        if (lower.startsWith("arena_record_")) {
+            String sub = lower.substring(13);
+            String arenaName;
+            int type = 0; // 0: formatted, 1: clock (00:00.00), 2: raw millis, 3: decimal seconds
+
+            if (sub.startsWith("raw_")) {
+                arenaName = params.substring(17);
+                type = 2;
+            } else if (sub.startsWith("ms_")) {
+                arenaName = params.substring(16);
+                type = 2;
+            } else if (sub.startsWith("seconds_")) {
+                arenaName = params.substring(21);
+                type = 3;
+            } else if (sub.startsWith("sec_")) {
+                arenaName = params.substring(17);
+                type = 3;
+            } else if (sub.startsWith("clock_")) {
+                arenaName = params.substring(19);
+                type = 1;
+            } else if (sub.startsWith("formatted_")) {
+                arenaName = params.substring(23);
+                type = 0;
+            } else {
+                arenaName = params.substring(13);
+                type = 0;
+            }
+
             var arena = plugin.getArena(arenaName);
             if (arena == null || arena.bestTimes.isEmpty())
                 return "N/A";
 
             long record = arena.bestTimes.values().stream().mapToLong(Long::longValue).min().orElse(0);
-            return formatTime(record);
+            return switch (type) {
+                case 1 -> Utils.formatClockTime(record);
+                case 2 -> String.valueOf(record);
+                case 3 -> String.format(Locale.US, "%.2f", record / 1000.0);
+                default -> Utils.formatTime(record);
+            };
         }
 
         // %iceboat_total_arenas%
@@ -132,13 +217,5 @@ public class IceBoatPlaceholders extends PlaceholderExpansion {
         if (races >= 1)
             return "§7§lNewcomer";
         return "§8§lRookie";
-    }
-
-    private String formatTime(long millis) {
-        long totalSeconds = millis / 1000;
-        int minutes = (int) (totalSeconds / 60);
-        int seconds = (int) (totalSeconds % 60);
-        int ms = (int) ((millis % 1000) / 10);
-        return String.format("%d:%02d.%02d", minutes, seconds, ms);
     }
 }

@@ -164,6 +164,22 @@ public class Utils {
         return sb.toString();
     }
 
+    public static String formatClockTime(long millis) {
+        long totalSeconds = millis / 1000;
+        long minutes = totalSeconds / 60;
+        long seconds = totalSeconds % 60;
+        long ms = (millis % 1000) / 10;
+
+        StringBuilder sb = new StringBuilder(10);
+        if (minutes < 10) sb.append('0');
+        sb.append(minutes).append(':');
+        if (seconds < 10) sb.append('0');
+        sb.append(seconds).append('.');
+        if (ms < 10) sb.append('0');
+        sb.append(ms);
+        return sb.toString();
+    }
+
     // ZERO-ALLOCATION KINEMATIC GEOMETRY
     public static boolean lineSegmentIntersectsSphere(Location p1, Location p2, Location sphereCenter, double radius) {
         if (p1 == null || p2 == null || sphereCenter == null)

@@ -26,7 +26,7 @@ Are you a filipino and want to host your Minecraft server in the Philippines? Vi
 | **Ice Staircase Gliding** | Instant 1-block ice step-up climbing with zero momentum loss |
 | **Zero-Collision Assist** | Anti-rubberband protection for vanilla clients + OpenBoatUtils support |
 | **Titles System** | Unlockable ranks based on wins |
-| **PlaceholderAPI** | Stats placeholders for scoreboards |
+| **PlaceholderAPI** | Stats, ajLeaderboards sorting, and DecentHolograms timing placeholders |
 | **Discord Integration** | Rich embeds for race results and records |
 
 ---
@@ -38,7 +38,7 @@ Are you a filipino and want to host your Minecraft server in the Philippines? Vi
    - Standalone (Built-in PacketEvents & TextDisplay Hologram Engine - No ProtocolLib or DecentHolograms required!)
    - *(Optional)* [PlaceholderAPI](https://www.spigotmc.org/resources/placeholderapi.6245/)
 
-2. Download `IceBoatRacing-3.2.3.jar` and place in `/plugins`
+2. Download `IceBoatRacing-3.2.4.jar` and place in `/plugins`
 3. **Restart** the server (do not use `/reload`)
 4. Configure `config.yml` as needed
 
@@ -75,12 +75,22 @@ Are you a filipino and want to host your Minecraft server in the Philippines? Vi
 | `%iceboat_wins%` | Total wins |
 | `%iceboat_races%` | Races played |
 | `%iceboat_winrate%` | Win percentage |
-| `%iceboat_best_time_<arena>%` | Best time on arena |
 | `%iceboat_current_arena%` | Current arena name |
 | `%iceboat_title%` | Current title |
 | `%iceboat_in_race%` | true/false |
-| `%iceboat_arena_record_<arena>%` | Arena record time |
 | `%iceboat_total_arenas%` | Total arena count |
+| `%iceboat_best_time_<arena>%` | Personal best time (`M:SS.ms`, e.g. `0:45.12`) |
+| `%iceboat_best_time_clock_<arena>%` | Personal best with uniform width (`MM:SS.ms`, e.g. `00:45.12`) |
+| `%iceboat_best_time_raw_<arena>%` | Personal best in raw milliseconds (`45120`, for ajLeaderboards) |
+| `%iceboat_best_time_seconds_<arena>%` | Personal best in decimal seconds (`45.12`) |
+| `%iceboat_arena_record_<arena>%` | Track record time (`M:SS.ms`, e.g. `0:45.12`) |
+| `%iceboat_arena_record_clock_<arena>%` | Track record with uniform width (`MM:SS.ms`, e.g. `00:45.12`) |
+| `%iceboat_arena_record_raw_<arena>%` | Track record in raw milliseconds (`45120`) |
+| `%iceboat_arena_record_seconds_<arena>%` | Track record in decimal seconds (`45.12`) |
+| `%iceboat_arena_record_holder_<arena>%` | Player name holding the track record |
+
+> **Leaderboards Tip:** In ajLeaderboards, track `%iceboat_best_time_raw_<arena>%` with `reverse-sort: true` so the leaderboard sorts by lowest time in milliseconds.  
+> **Holograms Tip:** Use `%iceboat_best_time_clock_<arena>%` or `%iceboat_arena_record_clock_<arena>%` on DecentHolograms for consistent character spacing (`00:00.00`).
 
 ---
 

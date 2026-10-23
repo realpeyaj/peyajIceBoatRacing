@@ -106,6 +106,35 @@ public class RaceArena {
     // Fake entity IDs for ghosts
     private final Map<UUID, Integer> ghostEntityIds = new HashMap<>();
 
+    public void cleanupGhost(Player p) {
+        if (p == null) return;
+        Integer ghostId = ghostEntityIds.remove(p.getUniqueId());
+        if (ghostId != null && p.isOnline()) {
+            PacketUtils.destroyFakeEntity(p, ghostId);
+        }
+    }
+
+    public void cleanupGhost(UUID uuid) {
+        if (uuid == null) return;
+        Integer ghostId = ghostEntityIds.remove(uuid);
+        if (ghostId != null) {
+            Player p = Bukkit.getPlayer(uuid);
+            if (p != null && p.isOnline()) {
+                PacketUtils.destroyFakeEntity(p, ghostId);
+            }
+        }
+    }
+
+    public void cleanupAllGhosts() {
+        for (Map.Entry<UUID, Integer> entry : new HashMap<>(ghostEntityIds).entrySet()) {
+            Player p = Bukkit.getPlayer(entry.getKey());
+            if (p != null && p.isOnline() && entry.getValue() != null) {
+                PacketUtils.destroyFakeEntity(p, entry.getValue());
+            }
+        }
+        ghostEntityIds.clear();
+    }
+
     // Teleport grace tracking to prevent PacketEvents from blocking intentional teleports
     private final Map<UUID, Long> teleportGraceUntil = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -503,6 +532,7 @@ public class RaceArena {
     public void resetTimeTrial(Player p) {
         if (!isTimeTrialMode || !players.contains(p.getUniqueId()))
             return;
+        cleanupGhost(p);
         p.sendMessage(Component.text("↺ Run Reset!", NamedTextColor.YELLOW));
         p.playSound(p.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 2f);
 
@@ -531,6 +561,7 @@ public class RaceArena {
     }
 
     public void removePlayer(Player p) {
+        cleanupGhost(p);
         if (spectators.contains(p.getUniqueId())) {
             try {
                 if (p.getGameMode() == GameMode.SPECTATOR) {
@@ -626,6 +657,7 @@ public class RaceArena {
         checkpointTimestamps.clear();
         ghostPlaybackTick = 0;
         tickCounter = 0;
+        cleanupAllGhosts();
 
         // Start replay recording
         if (!isTimeTrialSession && players.size() > 1) {
@@ -779,14 +811,7 @@ public class RaceArena {
         playerSpawnLocations.clear();
 
         // Clean up fake entities
-        for (UUID uuid : players) {
-            if (ghostEntityIds.containsKey(uuid)) {
-                Player p = Bukkit.getPlayer(uuid);
-                if (p != null)
-                    PacketUtils.destroyFakeEntity(p, ghostEntityIds.get(uuid));
-            }
-        }
-        ghostEntityIds.clear();
+        cleanupAllGhosts();
 
         for (UUID uuid : players) {
             Player p = Bukkit.getPlayer(uuid);
@@ -872,12 +897,9 @@ public class RaceArena {
                     }
                 }
             } else if (ghostPlaybackTick >= (bestGhost != null ? bestGhost.points.size() : 0)) {
-                for (UUID uuid : ghostEntityIds.keySet()) {
-                    Player p = Bukkit.getPlayer(uuid);
-                    if (p != null)
-                        PacketUtils.destroyFakeEntity(p, ghostEntityIds.get(uuid));
+                if (!ghostEntityIds.isEmpty()) {
+                    cleanupAllGhosts();
                 }
-                ghostEntityIds.clear();
             }
             ghostPlaybackTick++;
 
@@ -1114,6 +1136,7 @@ public class RaceArena {
     }
 
     private void finishPlayer(Player p) {
+        cleanupGhost(p);
         stopMusic(p);
         if (finishOrder.contains(p.getUniqueId()))
             return;
